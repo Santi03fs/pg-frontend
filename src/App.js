@@ -51,11 +51,11 @@ function App() {
   // NUEVO: Filtro para la pestaña de presupuestos
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
 
-  // ================= CARGA DE DATOS =================
+// ================= CARGA DE DATOS =================
   useEffect(() => {
     cargarTodo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   const cargarTodo = () => {
     cargarObras(); 
     cargarTrabajadores(); 
