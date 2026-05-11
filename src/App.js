@@ -1,23 +1,434 @@
-import logo from './logo.svg';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// ================= LOGOTIPO GRUPO PG =================
+const LogoPG = () => (
+  <svg height="50" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+    <text transform="translate(35, 88) rotate(-90)" fill="#000" fontFamily="Arial Black, Impact, sans-serif" fontSize="26" fontWeight="900" letterSpacing="1">GRUPO</text>
+    <text x="45" y="88" fill="#000" fontFamily="Arial Black, Impact, sans-serif" fontSize="110" fontWeight="900" letterSpacing="-8">PG</text>
+    <rect x="45" y="94" width="225" height="22" fill="#E60000" />
+    <text x="157" y="111" fill="#FFF" fontFamily="Arial Black, sans-serif" fontSize="15" fontWeight="900" textAnchor="middle" letterSpacing="0.5">WWW.GRUPO-PG.ES</text>
+  </svg>
+);
+
 function App() {
+  const [seccionActiva, setSeccionActiva] = useState('gastos'); // Te lo dejo en gastos por defecto para que lo pruebes
+
+  // ================= ESTADOS GENERALES =================
+  const [obras, setObras] = useState([]);
+  const [trabajadores, setTrabajadores] = useState([]);
+  const [asistencias, setAsistencias] = useState([]);
+  const [gastos, setGastos] = useState([]);
+
+  // ================= ESTADOS FORMULARIOS =================
+  const [cliente, setCliente] = useState('');
+  const [nombreObra, setNombreObra] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  
+  const [nombreTrabajador, setNombreTrabajador] = useState('');
+  const [dni, setDni] = useState('');
+  const [telefono, setTelefono] = useState('');
+  
+  const [fechaAsistencia, setFechaAsistencia] = useState('');
+  const [idTrabajadorSel, setIdTrabajadorSel] = useState('');
+  const [idObraSelAsis, setIdObraSelAsis] = useState('');
+  const [horas, setHoras] = useState('');
+  
+  const [idObraSelGasto, setIdObraSelGasto] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [fechaGasto, setFechaGasto] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [provTrabajador, setProvTrabajador] = useState('');
+  const [udsHoras, setUdsHoras] = useState('');
+  const [precioNeto, setPrecioNeto] = useState('');
+  const [precioPvp, setPrecioPvp] = useState('');
+
+  // ================= ESTADOS INFORME EDITABLE Y FILTROS =================
+  const [mesFiltro, setMesFiltro] = useState(new Date().toISOString().slice(0, 7));
+  const [trabajadorFiltro, setTrabajadorFiltro] = useState('');
+  const [cuadrante, setCuadrante] = useState([]); 
+  
+  // NUEVO: Filtro para la pestaña de presupuestos
+  const [filtroObraGastos, setFiltroObraGastos] = useState('');
+
+  // ================= CARGA DE DATOS =================
+  useEffect(() => {
+    cargarTodo();
+  }, []);
+
+  const cargarTodo = () => {
+    cargarObras(); 
+    cargarTrabajadores(); 
+    cargarAsistencias(); 
+    cargarGastos();
+  };
+
+  const cargarObras = () => fetch('https://pg-backend-v364.onrender.com/api/obras').then(res => res.json()).then(setObras);
+  const cargarTrabajadores = () => fetch('https://pg-backend-v364.onrender.com/api/trabajadores').then(res => res.json()).then(setTrabajadores);
+  const cargarAsistencias = () => fetch('https://pg-backend-v364.onrender.com/api/asistencias').then(res => res.json()).then(setAsistencias);
+  const cargarGastos = () => fetch('https://pg-backend-v364.onrender.com/api/gastos').then(res => res.json()).then(setGastos);
+
+  // ================= LÓGICA DEL CUADRANTE EDITABLE =================
+  useEffect(() => {
+    if (mesFiltro && trabajadorFiltro && obras.length > 0) {
+      const [year, month] = mesFiltro.split('-');
+      const diasEnMes = new Date(year, month, 0).getDate();
+      const nombresDias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      const nuevoCuadrante = [];
+      for (let i = 1; i <= diasEnMes; i++) {
+        const fechaActual = new Date(year, month - 1, i);
+        const diaSemana = fechaActual.getDay();
+        const fechaStr = `${year}-${month}-${String(i).padStart(2, '0')}`;
+        
+        const parteDb = asistencias.find(a => a.idTrabajador === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
+        
+        nuevoCuadrante.push({
+          nDia: i, 
+          nMes: nombresMeses[fechaActual.getMonth()], 
+          nSem: nombresDias[diaSemana],
+          esFinde: diaSemana === 0 || diaSemana === 6,
+          fechaStr,
+          idAsis: parteDb ? parteDb.id : null,
+          asistencia: parteDb ? 'Sí' : '',
+          horario: parteDb && parteDb.horario ? parteDb.horario : '',
+          idObra: parteDb ? parteDb.idObra : '',
+          horas: parteDb ? parteDb.horasTrabajadas : '',
+          partida: parteDb && parteDb.partida ? parteDb.partida : '', 
+          descripcionExtra: parteDb && parteDb.descripcion ? parteDb.descripcion : '' 
+        });
+      }
+      setCuadrante(nuevoCuadrante);
+    }
+  }, [mesFiltro, trabajadorFiltro, asistencias, obras]);
+
+  const handleEditCuadrante = (index, campo, valor) => {
+    const copia = [...cuadrante];
+    copia[index][campo] = valor;
+    
+    if ((campo === 'idObra' || campo === 'horas' || campo === 'horario' || campo === 'partida' || campo === 'descripcionExtra') && valor !== '') {
+      copia[index].asistencia = 'Sí';
+    }
+    setCuadrante(copia);
+  };
+
+  const guardarCambiosCuadrante = async () => {
+    const editados = cuadrante.filter(d => d.asistencia === 'Sí' || d.horas !== '' || d.idObra !== '' || d.horario !== '' || d.partida !== '' || d.descripcionExtra !== '');
+    
+    for (const dia of editados) {
+      const payload = {
+        id: dia.idAsis, 
+        fecha: dia.fechaStr, 
+        idTrabajador: parseInt(trabajadorFiltro),
+        idObra: parseInt(dia.idObra) || null, 
+        haAsistido: true, 
+        horasTrabajadas: parseFloat(dia.horas) || 0,
+        horario: dia.horario,
+        partida: dia.partida,
+        descripcion: dia.descripcionExtra
+      };
+      
+      await fetch('https://pg-backend-v364.onrender.com/api/asistencias', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      });
+    }
+    alert("¡Cuadrante guardado en la base de datos con éxito!"); 
+    cargarAsistencias();
+  };
+
+  // ================= FUNCIONES GUARDAR ESTÁNDAR =================
+  const guardarObra = (e) => { 
+    e.preventDefault(); 
+    fetch('https://pg-backend-v364.onrender.com/api/obras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, nombreObra, fechaInicio }) })
+    .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); }); 
+  };
+  
+  const guardarTrabajador = (e) => { 
+    e.preventDefault(); 
+    fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombreTrabajador, dni, telefono, estado: 'Activo' }) })
+    .then(() => { setNombreTrabajador(''); setDni(''); setTelefono(''); cargarTrabajadores(); }); 
+  };
+  
+  const guardarAsistencia = (e) => { 
+    e.preventDefault(); 
+    fetch('https://pg-backend-v364.onrender.com/api/asistencias', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fecha: fechaAsistencia, idTrabajador: parseInt(idTrabajadorSel), idObra: parseInt(idObraSelAsis), haAsistido: true, horasTrabajadas: parseFloat(horas) }) })
+    .then(() => { setFechaAsistencia(''); setIdTrabajadorSel(''); setIdObraSelAsis(''); setHoras(''); cargarAsistencias(); }); 
+  };
+  
+  const guardarGasto = (e) => { 
+    e.preventDefault(); 
+    fetch('https://pg-backend-v364.onrender.com/api/gastos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
+    .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
+  };
+
+  // ================= HELPERS Y CÁLCULOS FILTRADOS =================
+  const getNombreObra = (id) => obras.find(o => o.id === id)?.nombreObra || '';
+  const getNombreTrabajador = (id) => trabajadores.find(t => t.id === id)?.nombre || 'Desconocido';
+  
+  // Magia de filtrado: Si hay una obra seleccionada en el filtro, nos quedamos solo con esos gastos
+  const gastosFiltrados = filtroObraGastos 
+    ? gastos.filter(g => g.idObra === parseInt(filtroObraGastos)) 
+    : gastos;
+
+  // Calculamos los totales usando SOLO los gastos filtrados
+  const totalGastosNeto = gastosFiltrados.reduce((s, g) => s + (g.precioNeto || 0), 0);
+  const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
+  const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
+
+  // ================= INTERFAZ =================
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', padding: '30px', fontFamily: '"Segoe UI", sans-serif' }}>
+      
+      <style>{`
+        @media print { 
+          .no-print { display: none !important; } 
+          body { background-color: white !important; padding: 0 !important; }
+          .print-container { width: 100% !important; box-shadow: none !important; padding: 0 !important; } 
+          .tabla-papel { width: 100% !important; border: 1px solid black !important; border-collapse: collapse !important; } 
+          .tabla-papel th, .tabla-papel td { border: 1px solid black !important; font-size: 11px !important; padding: 4px !important; color: black !important; } 
+          .fondo-amarillo { background-color: #fff200 !important; -webkit-print-color-adjust: exact; } 
+          .input-paper { border: none !important; background: transparent !important; color: black !important; width: 100%; font-size: 11px; padding: 0; margin: 0; -webkit-appearance: none; appearance: none; } 
+        }
+        .input-paper { width: 100%; border: 1px solid #ddd; padding: 5px; font-size: 12px; outline: none; border-radius: 4px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
+        .input-paper:focus { border-color: #3498db; background: white; }
+        .btn-nav { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 13px; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #eee; }
+        .btn-action { padding: 12px; cursor: pointer; border: none; border-radius: 6px; color: white; font-weight: bold; font-size: 14px; }
+        .tabla-general { width: 100%; border-collapse: collapse; text-align: left; }
+        .tabla-general th { padding: 12px; color: white; }
+        .tabla-general td { padding: 12px; border-bottom: 1px solid #f0f0f0; }
+        .input-standard { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
+      `}</style>
+
+      {/* CABECERA (NO SE IMPRIME) */}
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', backgroundColor: 'white', padding: '15px 25px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <LogoPG /> 
+          <div style={{width: '1px', height: '40px', background: '#ddd', margin: '0 10px'}}></div> 
+          <h2 style={{margin:0, fontSize:'20px', color: '#2c3e50'}}>GESTIÓN CONSTRUCTORA</h2>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setSeccionActiva('obras')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'obras' ? '#3498db' : '#ecf0f1', color: seccionActiva === 'obras' ? 'white' : '#7f8c8d' }}>Obras</button>
+          <button onClick={() => setSeccionActiva('trabajadores')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'trabajadores' ? '#2ecc71' : '#ecf0f1', color: seccionActiva === 'trabajadores' ? 'white' : '#7f8c8d' }}>Trabajadores</button>
+          <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
+          <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Presupuestos</button>
+          <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Informes</button>
+        </div>
+      </div>
+
+      <div className="card print-container">
+        
+        {/* ================= 1. OBRAS ================= */}
+        {seccionActiva === 'obras' && (
+          <section className="no-print">
+            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>📋 Gestión de Obras</h2>
+            <form onSubmit={guardarObra} className="form-grid">
+              <input className="input-standard" placeholder="Cliente" value={cliente} onChange={e=>setCliente(e.target.value)} required />
+              <input className="input-standard" placeholder="Nombre Obra" value={nombreObra} onChange={e=>setNombreObra(e.target.value)} required />
+              <input className="input-standard" type="date" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)} required />
+              <button type="submit" className="btn-action" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
+            </form>
+            <table className="tabla-general">
+              <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th></tr></thead>
+              <tbody>{obras.map(o => <tr key={o.id}><td>{o.id}</td><td>{o.cliente}</td><td><strong>{o.nombreObra}</strong></td><td>{o.fechaInicio}</td></tr>)}</tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ================= 2. TRABAJADORES ================= */}
+        {seccionActiva === 'trabajadores' && (
+          <section className="no-print">
+            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>👷 Plantilla de Personal</h2>
+            <form onSubmit={guardarTrabajador} className="form-grid">
+              <input className="input-standard" placeholder="Nombre Completo" value={nombreTrabajador} onChange={e=>setNombreTrabajador(e.target.value)} required />
+              <input className="input-standard" placeholder="DNI" value={dni} onChange={e=>setDni(e.target.value)} />
+              <input className="input-standard" placeholder="Teléfono" value={telefono} onChange={e=>setTelefono(e.target.value)} />
+              <button type="submit" className="btn-action" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
+            </form>
+            <table className="tabla-general">
+              <thead><tr style={{background: '#2ecc71'}}><th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th></tr></thead>
+              <tbody>{trabajadores.map(t => <tr key={t.id}><td>{t.id}</td><td><strong>{t.nombre}</strong></td><td>{t.dni}</td><td>{t.telefono}</td><td>{t.estado}</td></tr>)}</tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ================= 3. ASISTENCIAS ================= */}
+        {seccionActiva === 'asistencias' && (
+          <section className="no-print">
+            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>🕒 Registro Rápido de Horas</h2>
+            <form onSubmit={guardarAsistencia} className="form-grid">
+              <input className="input-standard" type="date" value={fechaAsistencia} onChange={e=>setFechaAsistencia(e.target.value)} required />
+              <select className="input-standard" value={idTrabajadorSel} onChange={e=>setIdTrabajadorSel(e.target.value)} required><option value="">-- Trabajador --</option>{trabajadores.map(t=><option key={t.id} value={t.id}>{t.nombre}</option>)}</select>
+              <select className="input-standard" value={idObraSelAsis} onChange={e=>setIdObraSelAsis(e.target.value)} required><option value="">-- Obra --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
+              <div style={{display:'flex', gap:'10px'}}>
+                <input className="input-standard" style={{width:'100%'}} type="number" step="0.5" placeholder="Horas" value={horas} onChange={e=>setHoras(e.target.value)} required />
+                <button type="submit" className="btn-action" style={{backgroundColor: '#f39c12', width:'100%'}}>Registrar</button>
+              </div>
+            </form>
+            <table className="tabla-general">
+              <thead><tr style={{background: '#f39c12'}}><th>Fecha</th><th>Trabajador</th><th>Obra</th><th>Horas</th></tr></thead>
+              <tbody>{asistencias.map(a => <tr key={a.id}><td>{a.fecha}</td><td>{getNombreTrabajador(a.idTrabajador)}</td><td>{getNombreObra(a.idObra)}</td><td>{a.horasTrabajadas} h</td></tr>)}</tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ================= 4. GASTOS Y PRESUPUESTOS (CON FILTRO) ================= */}
+        {seccionActiva === 'gastos' && (
+          <section className="no-print">
+            
+            {/* ENCABEZADO Y FILTRO DE OBRA */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
+              <h2 style={{ color: '#2c3e50', margin: 0 }}>📊 Presupuestos y Beneficios</h2>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar Resultados por Obra:</label>
+                <select 
+                  className="input-standard" 
+                  style={{ width: '300px', backgroundColor: '#e1f5fe', borderColor: '#81d4fa', fontWeight: 'bold' }}
+                  value={filtroObraGastos} 
+                  onChange={e => setFiltroObraGastos(e.target.value)}
+                >
+                  <option value="">-- Todas las Obras (Resumen Global) --</option>
+                  {obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra} - {o.cliente}</option>)}
+                </select>
+              </div>
+            </div>
+            
+            {/* TARJETAS DE RESULTADOS (Se actualizan según el filtro) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '25px' }}>
+              <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #e74c3c' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>GASTOS (NETO)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#e74c3c'}}>{totalGastosNeto.toFixed(2)} €</h3></div>
+              <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #3498db' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>INGRESOS PROYECTADOS (PVP)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#3498db'}}>{totalFacturadoPvp.toFixed(2)} €</h3></div>
+              <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #2ecc71', backgroundColor: beneficioTotal >= 0 ? '#f0fff4' : '#fff5f5' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>BENEFICIO BRUTO</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color: beneficioTotal >= 0 ? '#2ecc71' : '#e74c3c'}}>{beneficioTotal.toFixed(2)} €</h3></div>
+            </div>
+
+            {/* FORMULARIO PARA AÑADIR GASTO */}
+            <form onSubmit={guardarGasto} className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+              <select className="input-standard" value={idObraSelGasto} onChange={e=>setIdObraSelGasto(e.target.value)} required><option value="">-- Obra a facturar --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
+              <select className="input-standard" value={categoria} onChange={e=>setCategoria(e.target.value)} required><option value="">-- Categoría --</option><option value="Materiales">Materiales</option><option value="Mano de Obra">Mano de Obra</option><option value="Varios">Varios</option></select>
+              <input className="input-standard" type="date" value={fechaGasto} onChange={e=>setFechaGasto(e.target.value)} required />
+              <input className="input-standard" placeholder="Proveedor / Tienda" value={provTrabajador} onChange={e=>setProvTrabajador(e.target.value)} />
+              <input className="input-standard" placeholder="Descripción del ticket o factura" value={descripcion} onChange={e=>setDescripcion(e.target.value)} style={{ gridColumn: 'span 2' }} />
+              <input className="input-standard" type="number" step="0.01" placeholder="Neto €" value={precioNeto} onChange={e=>setPrecioNeto(e.target.value)} style={{borderColor: '#e74c3c'}} />
+              <input className="input-standard" type="number" step="0.01" placeholder="PVP €" value={precioPvp} onChange={e=>setPrecioPvp(e.target.value)} style={{borderColor: '#3498db'}} />
+              <button type="submit" className="btn-action" style={{backgroundColor: '#e74c3c', gridColumn: 'span 4'}}>Registrar Gasto</button>
+            </form>
+
+            {/* TABLA (Muestra solo los gastos filtrados) */}
+            <table className="tabla-general">
+              <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th></tr></thead>
+              <tbody>
+                {gastosFiltrados.length === 0 ? (
+                  <tr><td colSpan="5" style={{textAlign:'center', color:'#95a5a6'}}>No hay gastos registrados para esta selección.</td></tr>
+                ) : (
+                  gastosFiltrados.map(g => (
+                    <tr key={g.id}>
+                      <td>{g.fecha}</td>
+                      <td><strong>{getNombreObra(g.idObra)}</strong> <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.categoria}</span></td>
+                      <td>{g.descripcion} <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.provTrabajador}</span></td>
+                      <td style={{color: '#e74c3c', fontWeight:'bold'}}>{g.precioNeto}€</td>
+                      <td style={{color: '#2980b9', fontWeight:'bold'}}>{g.precioPvp}€</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {/* ================= 5. INFORMES / CUADRANTE EDITABLE ================= */}
+        {seccionActiva === 'informes' && (
+          <section>
+            <div className="no-print" style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #eee', display: 'flex', gap: '15px', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Seleccionar Trabajador:</label>
+                <select className="input-standard" value={trabajadorFiltro} onChange={e => setTrabajadorFiltro(e.target.value)}>
+                  <option value="">-- Elige un trabajador --</option>
+                  {trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Mes del Cuadrante:</label>
+                <input className="input-standard" type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} />
+              </div>
+              
+              {trabajadorFiltro && (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+                  <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#3498db' }}>💾 GUARDAR DATOS</button>
+                  <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad' }}>🖨️ IMPRIMIR FOLIO</button>
+                </div>
+              )}
+            </div>
+
+            {trabajadorFiltro ? (
+              <div style={{ marginTop: '10px' }}>
+                <h3 style={{ textAlign: 'center', fontSize: '18px', margin: '0 0 15px 0', textTransform: 'uppercase' }}>
+                  PARTE DE TRABAJO - {getNombreTrabajador(parseInt(trabajadorFiltro))} ({mesFiltro})
+                </h3>
+                
+                <table className="tabla-papel" style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', textAlign: 'center' }}>
+                  <thead>
+                    <tr style={{ background: '#f0f0f0' }}>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '3%' }}>Día</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Mes</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '9%' }}>Día Sem.</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Asist.</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '10%' }}>Horario</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '25%' }}>Obra</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Horas</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '12%' }}>Partida</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '25%' }}>Descripción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cuadrante.map((diaInfo, index) => {
+                      const claseFila = diaInfo.esFinde ? "fondo-amarillo" : "";
+
+                      return (
+                        <tr key={index} className={claseFila} style={{ backgroundColor: diaInfo.esFinde ? '#fff200' : 'transparent', borderBottom: '1px solid black' }}>
+                          <td style={{ border: '1px solid black' }}>{diaInfo.nDia}</td>
+                          <td style={{ border: '1px solid black' }}>{diaInfo.nMes}</td>
+                          <td style={{ border: '1px solid black' }}>{diaInfo.nSem}</td>
+                          
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center'}} value={diaInfo.asistencia} onChange={e => handleEditCuadrante(index, 'asistencia', e.target.value)} />
+                          </td>
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center'}} placeholder="ej: 7 a 19:00" value={diaInfo.horario} onChange={e => handleEditCuadrante(index, 'horario', e.target.value)} />
+                          </td>
+                          <td style={{ border: '1px solid black', textAlign: 'left' }}>
+                            <select className="input-paper" value={diaInfo.idObra} onChange={e => handleEditCuadrante(index, 'idObra', e.target.value)}>
+                              <option value=""></option>
+                              {obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center'}} type="number" step="0.5" value={diaInfo.horas} onChange={e => handleEditCuadrante(index, 'horas', e.target.value)} />
+                          </td>
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" value={diaInfo.partida} onChange={e => handleEditCuadrante(index, 'partida', e.target.value)} />
+                          </td>
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" value={diaInfo.descripcionExtra} onChange={e => handleEditCuadrante(index, 'descripcionExtra', e.target.value)} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#95a5a6', border: '2px dashed #ecf0f1', borderRadius: '10px' }}>
+                <h3>👆 Selecciona un trabajador y un mes en el menú superior para cargar la hoja de cálculo.</h3>
+              </div>
+            )}
+          </section>
+        )}
+
+      </div>
     </div>
   );
 }
