@@ -146,6 +146,20 @@ function App() {
     .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); }); 
   };
   
+  // NUEVO: Función para cambiar el estado de la obra con el Switch
+  const toggleEstadoObra = async (id, estadoActual) => {
+    try {
+      await fetch(`https://pg-backend-v364.onrender.com/api/obras/${id}/estado`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(!estadoActual) // Enviamos el estado contrario
+      });
+      cargarObras(); // Refrescamos la tabla instantáneamente
+    } catch (error) {
+      console.error("Error al cambiar el estado de la obra:", error);
+    }
+  };
+
   const guardarTrabajador = (e) => { 
     e.preventDefault(); 
     fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombreTrabajador, dni, telefono, estado: 'Activo' }) })
@@ -202,6 +216,13 @@ function App() {
         .tabla-general th { padding: 12px; color: white; }
         .tabla-general td { padding: 12px; border-bottom: 1px solid #f0f0f0; }
         .input-standard { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
+        
+        /* NUEVO: Estilos para el Switch */
+        .switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .switch-input { width: 40px; height: 20px; appearance: none; background: #e74c3c; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: 0.3s; }
+        .switch-input:checked { background: #2ecc71; }
+        .switch-input::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .switch-input:checked::before { transform: translateX(20px); }
       `}</style>
 
       {/* CABECERA (NO SE IMPRIME) */}
@@ -233,8 +254,32 @@ function App() {
               <button type="submit" className="btn-action" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
             </form>
             <table className="tabla-general">
-              <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th></tr></thead>
-              <tbody>{obras.map(o => <tr key={o.id}><td>{o.id}</td><td>{o.cliente}</td><td><strong>{o.nombreObra}</strong></td><td>{o.fechaInicio}</td></tr>)}</tbody>
+              {/* NUEVO: Columna Estado en los títulos de la tabla */}
+              <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th></tr></thead>
+              <tbody>
+                {obras.map(o => (
+                  // NUEVO: Fila entera con estilo si está acabada y el interruptor visual
+                  <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
+                    <td>{o.id}</td>
+                    <td>{o.cliente}</td>
+                    <td style={{ textDecoration: o.finalizada ? 'line-through' : 'none' }}><strong>{o.nombreObra}</strong></td>
+                    <td>{o.fechaInicio}</td>
+                    <td>
+                      <label className="switch-container">
+                        <input 
+                          type="checkbox" 
+                          className="switch-input"
+                          checked={o.finalizada || false} 
+                          onChange={() => toggleEstadoObra(o.id, o.finalizada)} 
+                        />
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: o.finalizada ? '#2ecc71' : '#e74c3c' }}>
+                          {o.finalizada ? 'Acabada' : 'En Curso'}
+                        </span>
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </section>
         )}
