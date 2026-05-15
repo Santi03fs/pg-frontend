@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// NUEVO: Importamos la librería para generar Excel
 import * as XLSX from 'xlsx';
 import './App.css';
 
@@ -215,61 +214,100 @@ function App() {
     .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 
-  // NUEVO: LA MAGIA DE EXPORTAR A EXCEL
+  // ================= LA MAGIA DE EXPORTAR A EXCEL (MODO PLANTILLA BALANCE) =================
   const exportarObraExcel = (idObra) => {
     const obraTarget = obras.find(o => o.id === idObra);
     if (!obraTarget) return;
 
-    // 1. Datos Resumen de Obra
-    const datosObra = [{
-      "ID Proyecto": obraTarget.id,
-      "Cliente": obraTarget.cliente,
-      "Nombre de la Obra": obraTarget.nombreObra,
-      "Fecha de Inicio": obraTarget.fechaInicio,
-      "Estado": obraTarget.finalizada ? "Acabada" : "En Curso"
-    }];
+    // Aquí guardaremos las filas de la tabla de Excel
+    const datosExcel = [];
 
-    // 2. Datos de Horas Trabajadas
-    const horasObra = asistencias.filter(a => a.idObra === idObra);
-    const datosHoras = horasObra.map(a => ({
-      "Fecha": a.fecha,
-      "Trabajador": getNombreTrabajador(a.idTrabajador),
-      "Horas Imputadas": a.horasTrabajadas
-    }));
+    // 1. Cabecera calcada a la plantilla
+    datosExcel.push(["CLIENTE:", obraTarget.cliente, "", "", "", "", "", ""]);
+    datosExcel.push(["FECHA:", new Date().toLocaleDateString('es-ES'), "", "", "", "", "", ""]);
+    datosExcel.push(["OBRA:", obraTarget.nombreObra, "", "", "", "", "", ""]);
+    datosExcel.push([]);
+    datosExcel.push(["GASTOS", "", "", "", "", "", "", ""]);
+    datosExcel.push([]);
     
-    // Sumatorio horas para la hoja de Excel
-    const totalHoras = horasObra.reduce((sum, h) => sum + (h.horasTrabajadas || 0), 0);
-    datosHoras.push({ "Fecha": "TOTAL HORAS:", "Trabajador": "", "Horas Imputadas": totalHoras });
+    // Títulos de las columnas
+    datosExcel.push(["FECHA", "DESCRIPCIÓN", "PROV/TRABAJ.", "UDS./H", "NETO", "SUBTOTAL", "PVP", "SUBTOTAL"]);
+    datosExcel.push([]);
 
-    // 3. Datos de Gastos y Materiales
+    // 2. Sección de HORAS (Trabajadores de la obra)
+    const horasObra = asistencias.filter(a => a.idObra === idObra);
+    if (horasObra.length > 0) {
+      datosExcel.push(["", "ESTRUCTURA / MANO DE OBRA", "", "", "", "", "", ""]);
+      let totalHoras = 0;
+      horasObra.forEach(h => {
+        totalHoras += (h.horasTrabajadas || 0);
+        datosExcel.push([
+          h.fecha || "",
+          h.descripcion || h.partida || "Mano de obra",
+          getNombreTrabajador(h.idTrabajador),
+          h.horasTrabajadas || 0,
+          "", "", "", ""
+        ]);
+      });
+      // Sumatorio de horas
+      datosExcel.push(["", "", "TOTAL H", totalHoras, "", "", "", ""]);
+      datosExcel.push([]);
+    }
+
+    // 3. Sección de GASTOS (Agrupados por categoría)
     const gastosObra = gastos.filter(g => g.idObra === idObra);
-    const datosGastos = gastosObra.map(g => ({
-      "Fecha": g.fecha,
-      "Categoría": g.categoria,
-      "Proveedor": g.provTrabajador,
-      "Descripción": g.descripcion,
-      "Coste Neto (€)": g.precioNeto,
-      "PVP (€)": g.precioPvp
-    }));
+    const categorias = [...new Set(gastosObra.map(g => g.categoria))];
+    
+    let totalGlobalNeto = 0;
+    let totalGlobalPvp = 0;
 
-    // Sumatorios de gastos para la hoja de Excel
-    const totalNeto = gastosObra.reduce((sum, g) => sum + (g.precioNeto || 0), 0);
-    const totalPvp = gastosObra.reduce((sum, g) => sum + (g.precioPvp || 0), 0);
-    datosGastos.push({ "Fecha": "TOTALES:", "Categoría": "", "Proveedor": "", "Descripción": "", "Coste Neto (€)": totalNeto, "PVP (€)": totalPvp });
+    categorias.forEach(cat => {
+      datosExcel.push(["", cat.toUpperCase() + ":", "", "", "", "", "", ""]);
+      const gastosCat = gastosObra.filter(g => g.categoria === cat);
+      
+      gastosCat.forEach(g => {
+        const neto = parseFloat(g.precioNeto) || 0;
+        const pvp = parseFloat(g.precioPvp) || 0;
+        
+        totalGlobalNeto += neto;
+        totalGlobalPvp += pvp;
 
-    // Creamos el libro de Excel y las 3 hojas
+        datosExcel.push([
+          g.fecha || "",
+          g.descripcion || "",
+          g.provTrabajador || "",
+          g.udsHoras || "",
+          neto,
+          neto, // Subtotal Neto
+          pvp,
+          pvp   // Subtotal PVP
+        ]);
+      });
+    });
+
+    // 4. Sumatorio de euros al final del todo
+    datosExcel.push([]);
+    datosExcel.push(["", "", "", "TOTAL €", "", totalGlobalNeto, "", totalGlobalPvp]);
+
+    // Creamos el libro y la hoja
     const wb = XLSX.utils.book_new();
-    const wsObra = XLSX.utils.json_to_sheet(datosObra);
-    const wsHoras = XLSX.utils.json_to_sheet(datosHoras);
-    const wsGastos = XLSX.utils.json_to_sheet(datosGastos);
+    const ws = XLSX.utils.aoa_to_sheet(datosExcel);
 
-    // Añadimos las hojas al libro
-    XLSX.utils.book_append_sheet(wb, wsObra, "Resumen Proyecto");
-    XLSX.utils.book_append_sheet(wb, wsHoras, "Horas Trabajadas");
-    XLSX.utils.book_append_sheet(wb, wsGastos, "Gastos y Materiales");
+    // Ajuste del ancho de las columnas para que no se coma el texto
+    ws['!cols'] = [
+      { wch: 12 }, // FECHA
+      { wch: 45 }, // DESCRIPCIÓN (Más ancha)
+      { wch: 20 }, // PROV/TRABAJ.
+      { wch: 10 }, // UDS./H
+      { wch: 10 }, // NETO
+      { wch: 12 }, // SUBTOTAL
+      { wch: 10 }, // PVP
+      { wch: 12 }  // SUBTOTAL
+    ];
 
-    // Guardamos y forzamos la descarga del Excel
-    const nombreArchivo = `Reporte_${obraTarget.nombreObra.replace(/\s+/g, '_')}_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+    XLSX.utils.book_append_sheet(wb, ws, "GASTOS");
+
+    const nombreArchivo = `BALANCE_${obraTarget.nombreObra.toUpperCase().replace(/\s+/g, '_')}.xlsx`;
     XLSX.writeFile(wb, nombreArchivo);
   };
 
@@ -311,7 +349,6 @@ function App() {
         .btn-delete { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-delete:hover { background-color: #ff6b81; }
 
-        /* NUEVO: Botón de Excel */
         .btn-excel { background-color: #10ac84; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
         .btn-excel:hover { background-color: #1dd1a1; box-shadow: 0 2px 5px rgba(29, 209, 161, 0.4); }
 
@@ -373,7 +410,6 @@ function App() {
             </form>
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
-                {/* NUEVO: Columna de Informes en Obras */}
                 <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th><th>Informes</th></tr></thead>
                 <tbody>
                   {obras.map(o => (
@@ -395,7 +431,6 @@ function App() {
                           </span>
                         </label>
                       </td>
-                      {/* NUEVO: Botón de Exportar a Excel */}
                       <td>
                         <button onClick={() => exportarObraExcel(o.id)} className="btn-excel" title="Descargar datos de la obra en Excel">
                           📥 Exportar a Excel
@@ -537,7 +572,6 @@ function App() {
               <input className="input-standard" type="date" value={fechaGasto} onChange={e=>setFechaGasto(e.target.value)} required />
               <input className="input-standard" placeholder="Proveedor / Tienda" value={provTrabajador} onChange={e=>setProvTrabajador(e.target.value)} />
               
-              {/* En móviles estos ocuparán 1 columna entera de todos modos por el media query */}
               <input className="input-standard" placeholder="Descripción del ticket o factura" value={descripcion} onChange={e=>setDescripcion(e.target.value)} style={{ gridColumn: '1 / -1' }} />
               
               <div style={{display: 'flex', gap: '15px', gridColumn: '1 / -1'}}>
