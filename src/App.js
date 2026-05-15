@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+// NUEVO: Importamos la librería para generar Excel
+import * as XLSX from 'xlsx';
 import './App.css';
 
 // ================= LOGOTIPO GRUPO PG =================
@@ -12,7 +14,7 @@ const LogoPG = () => (
 );
 
 function App() {
-  const [seccionActiva, setSeccionActiva] = useState('asistencias'); 
+  const [seccionActiva, setSeccionActiva] = useState('obras'); 
 
   // ================= ESTADOS GENERALES =================
   const [obras, setObras] = useState([]);
@@ -67,6 +69,24 @@ function App() {
   const cargarTrabajadores = () => fetch('https://pg-backend-v364.onrender.com/api/trabajadores').then(res => res.json()).then(setTrabajadores);
   const cargarAsistencias = () => fetch('https://pg-backend-v364.onrender.com/api/asistencias').then(res => res.json()).then(setAsistencias);
   const cargarGastos = () => fetch('https://pg-backend-v364.onrender.com/api/gastos').then(res => res.json()).then(setGastos);
+
+  // ================= HELPERS Y CÁLCULOS FILTRADOS =================
+  const getNombreObra = (id) => obras.find(o => o.id === id)?.nombreObra || '';
+  const getNombreTrabajador = (id) => trabajadores.find(t => t.id === id)?.nombre || 'Desconocido';
+  
+  const gastosFiltrados = filtroObraGastos 
+    ? gastos.filter(g => g.idObra === parseInt(filtroObraGastos)) 
+    : gastos;
+
+  const totalGastosNeto = gastosFiltrados.reduce((s, g) => s + (g.precioNeto || 0), 0);
+  const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
+  const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
+
+  const asistenciasFiltradas = filtroTrabajadorAsis 
+    ? asistencias.filter(a => a.idTrabajador === parseInt(filtroTrabajadorAsis)) 
+    : asistencias;
+    
+  const totalHorasFiltradas = asistenciasFiltradas.reduce((suma, a) => suma + (a.horasTrabajadas || 0), 0);
 
   // ================= LÓGICA DEL CUADRANTE EDITABLE =================
   useEffect(() => {
@@ -195,27 +215,66 @@ function App() {
     .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 
-  // ================= HELPERS Y CÁLCULOS FILTRADOS =================
-  const getNombreObra = (id) => obras.find(o => o.id === id)?.nombreObra || '';
-  const getNombreTrabajador = (id) => trabajadores.find(t => t.id === id)?.nombre || 'Desconocido';
-  
-  const gastosFiltrados = filtroObraGastos 
-    ? gastos.filter(g => g.idObra === parseInt(filtroObraGastos)) 
-    : gastos;
+  // NUEVO: LA MAGIA DE EXPORTAR A EXCEL
+  const exportarObraExcel = (idObra) => {
+    const obraTarget = obras.find(o => o.id === idObra);
+    if (!obraTarget) return;
 
-  const totalGastosNeto = gastosFiltrados.reduce((s, g) => s + (g.precioNeto || 0), 0);
-  const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
-  const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
+    // 1. Datos Resumen de Obra
+    const datosObra = [{
+      "ID Proyecto": obraTarget.id,
+      "Cliente": obraTarget.cliente,
+      "Nombre de la Obra": obraTarget.nombreObra,
+      "Fecha de Inicio": obraTarget.fechaInicio,
+      "Estado": obraTarget.finalizada ? "Acabada" : "En Curso"
+    }];
 
-  const asistenciasFiltradas = filtroTrabajadorAsis 
-    ? asistencias.filter(a => a.idTrabajador === parseInt(filtroTrabajadorAsis)) 
-    : asistencias;
+    // 2. Datos de Horas Trabajadas
+    const horasObra = asistencias.filter(a => a.idObra === idObra);
+    const datosHoras = horasObra.map(a => ({
+      "Fecha": a.fecha,
+      "Trabajador": getNombreTrabajador(a.idTrabajador),
+      "Horas Imputadas": a.horasTrabajadas
+    }));
     
-  const totalHorasFiltradas = asistenciasFiltradas.reduce((suma, a) => suma + (a.horasTrabajadas || 0), 0);
+    // Sumatorio horas para la hoja de Excel
+    const totalHoras = horasObra.reduce((sum, h) => sum + (h.horasTrabajadas || 0), 0);
+    datosHoras.push({ "Fecha": "TOTAL HORAS:", "Trabajador": "", "Horas Imputadas": totalHoras });
+
+    // 3. Datos de Gastos y Materiales
+    const gastosObra = gastos.filter(g => g.idObra === idObra);
+    const datosGastos = gastosObra.map(g => ({
+      "Fecha": g.fecha,
+      "Categoría": g.categoria,
+      "Proveedor": g.provTrabajador,
+      "Descripción": g.descripcion,
+      "Coste Neto (€)": g.precioNeto,
+      "PVP (€)": g.precioPvp
+    }));
+
+    // Sumatorios de gastos para la hoja de Excel
+    const totalNeto = gastosObra.reduce((sum, g) => sum + (g.precioNeto || 0), 0);
+    const totalPvp = gastosObra.reduce((sum, g) => sum + (g.precioPvp || 0), 0);
+    datosGastos.push({ "Fecha": "TOTALES:", "Categoría": "", "Proveedor": "", "Descripción": "", "Coste Neto (€)": totalNeto, "PVP (€)": totalPvp });
+
+    // Creamos el libro de Excel y las 3 hojas
+    const wb = XLSX.utils.book_new();
+    const wsObra = XLSX.utils.json_to_sheet(datosObra);
+    const wsHoras = XLSX.utils.json_to_sheet(datosHoras);
+    const wsGastos = XLSX.utils.json_to_sheet(datosGastos);
+
+    // Añadimos las hojas al libro
+    XLSX.utils.book_append_sheet(wb, wsObra, "Resumen Proyecto");
+    XLSX.utils.book_append_sheet(wb, wsHoras, "Horas Trabajadas");
+    XLSX.utils.book_append_sheet(wb, wsGastos, "Gastos y Materiales");
+
+    // Guardamos y forzamos la descarga del Excel
+    const nombreArchivo = `Reporte_${obraTarget.nombreObra.replace(/\s+/g, '_')}_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
+  };
 
   // ================= INTERFAZ =================
   return (
-    // NUEVO: RESPONSIVE - Añadido padding dinámico (menor en móviles)
     <div className="app-container" style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', fontFamily: '"Segoe UI", sans-serif' }}>
       
       <style>{`
@@ -252,14 +311,17 @@ function App() {
         .btn-delete { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-delete:hover { background-color: #ff6b81; }
 
-        /* NUEVO: RESPONSIVE - Toda la magia para móviles y tablets */
+        /* NUEVO: Botón de Excel */
+        .btn-excel { background-color: #10ac84; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .btn-excel:hover { background-color: #1dd1a1; box-shadow: 0 2px 5px rgba(29, 209, 161, 0.4); }
+
         .tarjetas-resultados { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; marginBottom: 25px; }
         .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background-color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .nav-buttons { display: flex; gap: 8px; }
         .filtro-container { display: flex; align-items: center; gap: 10px; }
         
         @media (max-width: 1024px) {
-          .form-grid { grid-template-columns: repeat(2, 1fr); } /* En tablets, los formularios bajan a 2 columnas */
+          .form-grid { grid-template-columns: repeat(2, 1fr); } 
           .btn-action.full-width-mobile { grid-column: span 2; }
         }
 
@@ -268,17 +330,15 @@ function App() {
           .card { padding: 15px; }
           .header-container { flex-direction: column; gap: 15px; text-align: center; }
           .nav-buttons { flex-wrap: wrap; justify-content: center; width: 100%; }
-          .btn-nav { flex: 1 1 calc(33% - 10px); font-size: 12px; } /* Botones en cuadraditos */
+          .btn-nav { flex: 1 1 calc(33% - 10px); font-size: 12px; } 
           
-          .form-grid { grid-template-columns: 1fr; } /* En móviles, todo en 1 columna hacia abajo */
+          .form-grid { grid-template-columns: 1fr; } 
           .btn-action.full-width-mobile { grid-column: span 1; }
           
-          .tarjetas-resultados { grid-template-columns: 1fr; gap: 10px; } /* Tarjetas de euros una debajo de otra */
+          .tarjetas-resultados { grid-template-columns: 1fr; gap: 10px; } 
           
           .filtro-container { flex-direction: column; align-items: flex-start; width: 100%; }
           .filtro-container select { width: 100% !important; }
-          
-          /* Oculta los separadores decorativos en móvil */
           .separador-header { display: none; }
         }
       `}</style>
@@ -311,10 +371,10 @@ function App() {
               <input className="input-standard" type="date" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)} required />
               <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
             </form>
-            {/* NUEVO: RESPONSIVE - Envoltorio para permitir scroll horizontal en tablas */}
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
-                <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th></tr></thead>
+                {/* NUEVO: Columna de Informes en Obras */}
+                <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th><th>Informes</th></tr></thead>
                 <tbody>
                   {obras.map(o => (
                     <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
@@ -334,6 +394,12 @@ function App() {
                             {o.finalizada ? 'Acabada' : 'En Curso'}
                           </span>
                         </label>
+                      </td>
+                      {/* NUEVO: Botón de Exportar a Excel */}
+                      <td>
+                        <button onClick={() => exportarObraExcel(o.id)} className="btn-excel" title="Descargar datos de la obra en Excel">
+                          📥 Exportar a Excel
+                        </button>
                       </td>
                     </tr>
                   ))}
