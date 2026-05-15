@@ -70,11 +70,11 @@ function App() {
   const cargarGastos = () => fetch('https://pg-backend-v364.onrender.com/api/gastos').then(res => res.json()).then(setGastos);
 
   // ================= HELPERS Y CÁLCULOS FILTRADOS =================
-  const getNombreObra = (id) => obras.find(o => o.id === id)?.nombreObra || '';
-  const getNombreTrabajador = (id) => trabajadores.find(t => t.id === id)?.nombre || 'Desconocido';
+  const getNombreObra = (id) => obras.find(o => Number(o.id) === Number(id))?.nombreObra || '';
+  const getNombreTrabajador = (id) => trabajadores.find(t => Number(t.id) === Number(id))?.nombre || 'Desconocido';
   
   const gastosFiltrados = filtroObraGastos 
-    ? gastos.filter(g => g.idObra === parseInt(filtroObraGastos)) 
+    ? gastos.filter(g => Number(g.idObra) === parseInt(filtroObraGastos)) 
     : gastos;
 
   const totalGastosNeto = gastosFiltrados.reduce((s, g) => s + (g.precioNeto || 0), 0);
@@ -82,7 +82,7 @@ function App() {
   const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
 
   const asistenciasFiltradas = filtroTrabajadorAsis 
-    ? asistencias.filter(a => a.idTrabajador === parseInt(filtroTrabajadorAsis)) 
+    ? asistencias.filter(a => Number(a.idTrabajador) === parseInt(filtroTrabajadorAsis)) 
     : asistencias;
     
   const totalHorasFiltradas = asistenciasFiltradas.reduce((suma, a) => suma + (a.horasTrabajadas || 0), 0);
@@ -101,7 +101,7 @@ function App() {
         const diaSemana = fechaActual.getDay();
         const fechaStr = `${year}-${month}-${String(i).padStart(2, '0')}`;
         
-        const parteDb = asistencias.find(a => a.idTrabajador === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
+        const parteDb = asistencias.find(a => Number(a.idTrabajador) === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
         
         nuevoCuadrante.push({
           nDia: i, 
@@ -214,78 +214,104 @@ function App() {
     .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 
-  // ================= LA MAGIA DE EXPORTAR A EXCEL (MODO PLANTILLA BALANCE) =================
+  // ================= LA MAGIA DE EXPORTAR A EXCEL (BLINDADA) =================
   const exportarObraExcel = (idObra) => {
-    const obraTarget = obras.find(o => o.id === idObra);
-    if (!obraTarget) return;
+    // 1. Forzamos la comparación numérica para evitar fallos
+    const targetId = Number(idObra);
+    const obraTarget = obras.find(o => Number(o.id) === targetId);
+    
+    if (!obraTarget) {
+      alert("No se pudo encontrar la información de esta obra.");
+      return;
+    }
 
-    // Aquí guardaremos las filas de la tabla de Excel
+    // Filtramos horas y gastos de forma segura (por si vienen anidados del backend)
+    const horasObra = asistencias.filter(a => 
+      Number(a.idObra) === targetId || (a.obra && Number(a.obra.id) === targetId)
+    );
+    
+    const gastosObra = gastos.filter(g => 
+      Number(g.idObra) === targetId || (g.obra && Number(g.obra.id) === targetId)
+    );
+
+    // Si la obra está totalmente vacía, avisamos
+    if (horasObra.length === 0 && gastosObra.length === 0) {
+      const confirmar = window.confirm("⚠️ Esta obra no tiene horas ni gastos registrados. ¿Quieres descargar el Excel vacío de todas formas?");
+      if (!confirmar) return;
+    }
+
     const datosExcel = [];
 
-    // 1. Cabecera calcada a la plantilla
-    datosExcel.push(["CLIENTE:", obraTarget.cliente, "", "", "", "", "", ""]);
+    // Cabecera calcada a la plantilla
+    datosExcel.push(["CLIENTE:", obraTarget.cliente || "", "", "", "", "", "", ""]);
     datosExcel.push(["FECHA:", new Date().toLocaleDateString('es-ES'), "", "", "", "", "", ""]);
-    datosExcel.push(["OBRA:", obraTarget.nombreObra, "", "", "", "", "", ""]);
+    datosExcel.push(["OBRA:", obraTarget.nombreObra || "", "", "", "", "", "", ""]);
     datosExcel.push([]);
     datosExcel.push(["GASTOS", "", "", "", "", "", "", ""]);
     datosExcel.push([]);
-    
-    // Títulos de las columnas
     datosExcel.push(["FECHA", "DESCRIPCIÓN", "PROV/TRABAJ.", "UDS./H", "NETO", "SUBTOTAL", "PVP", "SUBTOTAL"]);
     datosExcel.push([]);
 
-    // 2. Sección de HORAS (Trabajadores de la obra)
-    const horasObra = asistencias.filter(a => a.idObra === idObra);
+    // HORAS
     if (horasObra.length > 0) {
       datosExcel.push(["", "ESTRUCTURA / MANO DE OBRA", "", "", "", "", "", ""]);
       let totalHoras = 0;
       horasObra.forEach(h => {
-        totalHoras += (h.horasTrabajadas || 0);
+        const horasTrabajadas = parseFloat(h.horasTrabajadas) || 0;
+        totalHoras += horasTrabajadas;
+        
+        // Buscar al trabajador de forma blindada
+        const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
+        const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
+        const nombreT = trabajadorObj ? trabajadorObj.nombre : "Desconocido";
+
         datosExcel.push([
           h.fecha || "",
           h.descripcion || h.partida || "Mano de obra",
-          getNombreTrabajador(h.idTrabajador),
-          h.horasTrabajadas || 0,
+          nombreT,
+          horasTrabajadas,
           "", "", "", ""
         ]);
       });
-      // Sumatorio de horas
       datosExcel.push(["", "", "TOTAL H", totalHoras, "", "", "", ""]);
       datosExcel.push([]);
     }
 
-    // 3. Sección de GASTOS (Agrupados por categoría)
-    const gastosObra = gastos.filter(g => g.idObra === idObra);
-    const categorias = [...new Set(gastosObra.map(g => g.categoria))];
-    
+    // GASTOS
     let totalGlobalNeto = 0;
     let totalGlobalPvp = 0;
 
-    categorias.forEach(cat => {
-      datosExcel.push(["", cat.toUpperCase() + ":", "", "", "", "", "", ""]);
-      const gastosCat = gastosObra.filter(g => g.categoria === cat);
+    if (gastosObra.length > 0) {
+      // Extraemos las categorías, poniendo "VARIOS" si alguna viene en blanco
+      const categorias = [...new Set(gastosObra.map(g => g.categoria || 'VARIOS'))];
       
-      gastosCat.forEach(g => {
-        const neto = parseFloat(g.precioNeto) || 0;
-        const pvp = parseFloat(g.precioPvp) || 0;
+      categorias.forEach(cat => {
+        // Formateo seguro para evitar que rompa el Excel
+        datosExcel.push(["", String(cat).toUpperCase() + ":", "", "", "", "", "", ""]);
+        const gastosCat = gastosObra.filter(g => (g.categoria || 'VARIOS') === cat);
         
-        totalGlobalNeto += neto;
-        totalGlobalPvp += pvp;
+        gastosCat.forEach(g => {
+          const neto = parseFloat(g.precioNeto) || 0;
+          const pvp = parseFloat(g.precioPvp) || 0;
+          
+          totalGlobalNeto += neto;
+          totalGlobalPvp += pvp;
 
-        datosExcel.push([
-          g.fecha || "",
-          g.descripcion || "",
-          g.provTrabajador || "",
-          g.udsHoras || "",
-          neto,
-          neto, // Subtotal Neto
-          pvp,
-          pvp   // Subtotal PVP
-        ]);
+          datosExcel.push([
+            g.fecha || "",
+            g.descripcion || "",
+            g.provTrabajador || "",
+            g.udsHoras || "",
+            neto,
+            neto, 
+            pvp,
+            pvp   
+          ]);
+        });
       });
-    });
+    }
 
-    // 4. Sumatorio de euros al final del todo
+    // Sumatorio de euros al final del todo SIEMPRE se imprime
     datosExcel.push([]);
     datosExcel.push(["", "", "", "TOTAL €", "", totalGlobalNeto, "", totalGlobalPvp]);
 
@@ -293,21 +319,16 @@ function App() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(datosExcel);
 
-    // Ajuste del ancho de las columnas para que no se coma el texto
+    // Ajuste del ancho de las columnas para que se vea limpio
     ws['!cols'] = [
-      { wch: 12 }, // FECHA
-      { wch: 45 }, // DESCRIPCIÓN (Más ancha)
-      { wch: 20 }, // PROV/TRABAJ.
-      { wch: 10 }, // UDS./H
-      { wch: 10 }, // NETO
-      { wch: 12 }, // SUBTOTAL
-      { wch: 10 }, // PVP
-      { wch: 12 }  // SUBTOTAL
+      { wch: 12 }, { wch: 45 }, { wch: 20 }, { wch: 10 }, 
+      { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 }
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "GASTOS");
 
-    const nombreArchivo = `BALANCE_${obraTarget.nombreObra.toUpperCase().replace(/\s+/g, '_')}.xlsx`;
+    const nombreLimpio = (obraTarget.nombreObra || 'OBRA').toUpperCase().replace(/\s+/g, '_');
+    const nombreArchivo = `BALANCE_${nombreLimpio}.xlsx`;
     XLSX.writeFile(wb, nombreArchivo);
   };
 
