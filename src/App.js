@@ -3,7 +3,7 @@ import './App.css';
 
 // ================= LOGOTIPO GRUPO PG =================
 const LogoPG = () => (
-  <svg height="50" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+  <svg height="50" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', maxWidth: '100%' }}>
     <text transform="translate(35, 88) rotate(-90)" fill="#000" fontFamily="Arial Black, Impact, sans-serif" fontSize="26" fontWeight="900" letterSpacing="1">GRUPO</text>
     <text x="45" y="88" fill="#000" fontFamily="Arial Black, Impact, sans-serif" fontSize="110" fontWeight="900" letterSpacing="-8">PG</text>
     <rect x="45" y="94" width="225" height="22" fill="#E60000" />
@@ -49,7 +49,6 @@ function App() {
   const [cuadrante, setCuadrante] = useState([]); 
   
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
-  // NUEVO: Estado para el filtro de horas por trabajador
   const [filtroTrabajadorAsis, setFiltroTrabajadorAsis] = useState('');
 
 // ================= CARGA DE DATOS =================
@@ -208,7 +207,6 @@ function App() {
   const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
   const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
 
-  // NUEVO: Filtro mágico para las horas y cálculo total
   const asistenciasFiltradas = filtroTrabajadorAsis 
     ? asistencias.filter(a => a.idTrabajador === parseInt(filtroTrabajadorAsis)) 
     : asistencias;
@@ -217,52 +215,87 @@ function App() {
 
   // ================= INTERFAZ =================
   return (
-    <div style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', padding: '30px', fontFamily: '"Segoe UI", sans-serif' }}>
+    // NUEVO: RESPONSIVE - Añadido padding dinámico (menor en móviles)
+    <div className="app-container" style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', fontFamily: '"Segoe UI", sans-serif' }}>
       
       <style>{`
+        .app-container { padding: 30px; }
+        
         @media print { 
           .no-print { display: none !important; } 
           body { background-color: white !important; padding: 0 !important; }
+          .app-container { padding: 0 !important; }
           .print-container { width: 100% !important; box-shadow: none !important; padding: 0 !important; } 
           .tabla-papel { width: 100% !important; border: 1px solid black !important; border-collapse: collapse !important; } 
           .tabla-papel th, .tabla-papel td { border: 1px solid black !important; font-size: 11px !important; padding: 4px !important; color: black !important; } 
           .fondo-amarillo { background-color: #fff200 !important; -webkit-print-color-adjust: exact; } 
           .input-paper { border: none !important; background: transparent !important; color: black !important; width: 100%; font-size: 11px; padding: 0; margin: 0; -webkit-appearance: none; appearance: none; } 
         }
+        
         .input-paper { width: 100%; border: 1px solid #ddd; padding: 5px; font-size: 12px; outline: none; border-radius: 4px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
         .input-paper:focus { border-color: #3498db; background: white; }
-        .btn-nav { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 13px; }
+        .btn-nav { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 13px; text-align: center; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #eee; }
         .btn-action { padding: 12px; cursor: pointer; border: none; border-radius: 6px; color: white; font-weight: bold; font-size: 14px; }
-        .tabla-general { width: 100%; border-collapse: collapse; text-align: left; }
+        .tabla-general { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
         .tabla-general th { padding: 12px; color: white; }
         .tabla-general td { padding: 12px; border-bottom: 1px solid #f0f0f0; }
-        .input-standard { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
+        .input-standard { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; width: 100%; box-sizing: border-box; }
         
         .switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .switch-input { width: 40px; height: 20px; appearance: none; background: #e74c3c; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: 0.3s; }
+        .switch-input { width: 40px; height: 20px; appearance: none; background: #e74c3c; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: 0.3s; margin: 0;}
         .switch-input:checked { background: #2ecc71; }
         .switch-input::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .switch-input:checked::before { transform: translateX(20px); }
         
         .btn-delete { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-delete:hover { background-color: #ff6b81; }
+
+        /* NUEVO: RESPONSIVE - Toda la magia para móviles y tablets */
+        .tarjetas-resultados { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; marginBottom: 25px; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background-color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .nav-buttons { display: flex; gap: 8px; }
+        .filtro-container { display: flex; align-items: center; gap: 10px; }
+        
+        @media (max-width: 1024px) {
+          .form-grid { grid-template-columns: repeat(2, 1fr); } /* En tablets, los formularios bajan a 2 columnas */
+          .btn-action.full-width-mobile { grid-column: span 2; }
+        }
+
+        @media (max-width: 768px) {
+          .app-container { padding: 10px; }
+          .card { padding: 15px; }
+          .header-container { flex-direction: column; gap: 15px; text-align: center; }
+          .nav-buttons { flex-wrap: wrap; justify-content: center; width: 100%; }
+          .btn-nav { flex: 1 1 calc(33% - 10px); font-size: 12px; } /* Botones en cuadraditos */
+          
+          .form-grid { grid-template-columns: 1fr; } /* En móviles, todo en 1 columna hacia abajo */
+          .btn-action.full-width-mobile { grid-column: span 1; }
+          
+          .tarjetas-resultados { grid-template-columns: 1fr; gap: 10px; } /* Tarjetas de euros una debajo de otra */
+          
+          .filtro-container { flex-direction: column; align-items: flex-start; width: 100%; }
+          .filtro-container select { width: 100% !important; }
+          
+          /* Oculta los separadores decorativos en móvil */
+          .separador-header { display: none; }
+        }
       `}</style>
 
       {/* CABECERA */}
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', backgroundColor: 'white', padding: '15px 25px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      <div className="no-print header-container">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <LogoPG /> 
-          <div style={{width: '1px', height: '40px', background: '#ddd', margin: '0 10px'}}></div> 
+          <div className="separador-header" style={{width: '1px', height: '40px', background: '#ddd', margin: '0 10px'}}></div> 
           <h2 style={{margin:0, fontSize:'20px', color: '#2c3e50'}}>GESTIÓN CONSTRUCTORA</h2>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="nav-buttons">
           <button onClick={() => setSeccionActiva('obras')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'obras' ? '#3498db' : '#ecf0f1', color: seccionActiva === 'obras' ? 'white' : '#7f8c8d' }}>Obras</button>
-          <button onClick={() => setSeccionActiva('trabajadores')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'trabajadores' ? '#2ecc71' : '#ecf0f1', color: seccionActiva === 'trabajadores' ? 'white' : '#7f8c8d' }}>Trabajadores</button>
+          <button onClick={() => setSeccionActiva('trabajadores')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'trabajadores' ? '#2ecc71' : '#ecf0f1', color: seccionActiva === 'trabajadores' ? 'white' : '#7f8c8d' }}>Personal</button>
           <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
-          <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Presupuestos</button>
-          <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Informes</button>
+          <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Gastos</button>
+          <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Partes</button>
         </div>
       </div>
 
@@ -276,34 +309,37 @@ function App() {
               <input className="input-standard" placeholder="Cliente" value={cliente} onChange={e=>setCliente(e.target.value)} required />
               <input className="input-standard" placeholder="Nombre Obra" value={nombreObra} onChange={e=>setNombreObra(e.target.value)} required />
               <input className="input-standard" type="date" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)} required />
-              <button type="submit" className="btn-action" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
+              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
             </form>
-            <table className="tabla-general">
-              <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th></tr></thead>
-              <tbody>
-                {obras.map(o => (
-                  <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
-                    <td>{o.id}</td>
-                    <td>{o.cliente}</td>
-                    <td style={{ textDecoration: o.finalizada ? 'line-through' : 'none' }}><strong>{o.nombreObra}</strong></td>
-                    <td>{o.fechaInicio}</td>
-                    <td>
-                      <label className="switch-container">
-                        <input 
-                          type="checkbox" 
-                          className="switch-input"
-                          checked={o.finalizada || false} 
-                          onChange={() => toggleEstadoObra(o.id, o.finalizada)} 
-                        />
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: o.finalizada ? '#2ecc71' : '#e74c3c' }}>
-                          {o.finalizada ? 'Acabada' : 'En Curso'}
-                        </span>
-                      </label>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* NUEVO: RESPONSIVE - Envoltorio para permitir scroll horizontal en tablas */}
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-general">
+                <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th></tr></thead>
+                <tbody>
+                  {obras.map(o => (
+                    <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
+                      <td>{o.id}</td>
+                      <td>{o.cliente}</td>
+                      <td style={{ textDecoration: o.finalizada ? 'line-through' : 'none' }}><strong>{o.nombreObra}</strong></td>
+                      <td>{o.fechaInicio}</td>
+                      <td>
+                        <label className="switch-container">
+                          <input 
+                            type="checkbox" 
+                            className="switch-input"
+                            checked={o.finalizada || false} 
+                            onChange={() => toggleEstadoObra(o.id, o.finalizada)} 
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: o.finalizada ? '#2ecc71' : '#e74c3c' }}>
+                            {o.finalizada ? 'Acabada' : 'En Curso'}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
@@ -315,43 +351,44 @@ function App() {
               <input className="input-standard" placeholder="Nombre Completo" value={nombreTrabajador} onChange={e=>setNombreTrabajador(e.target.value)} required />
               <input className="input-standard" placeholder="DNI" value={dni} onChange={e=>setDni(e.target.value)} />
               <input className="input-standard" placeholder="Teléfono" value={telefono} onChange={e=>setTelefono(e.target.value)} />
-              <button type="submit" className="btn-action" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
+              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
             </form>
-            <table className="tabla-general">
-              <thead>
-                <tr style={{background: '#2ecc71'}}>
-                  <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trabajadores.map(t => (
-                  <tr key={t.id}>
-                    <td>{t.id}</td>
-                    <td><strong>{t.nombre}</strong></td>
-                    <td>{t.dni}</td>
-                    <td>{t.telefono}</td>
-                    <td>{t.estado}</td>
-                    <td>
-                      <button onClick={() => eliminarTrabajador(t.id)} className="btn-delete">
-                        🗑️ Borrar
-                      </button>
-                    </td>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-general">
+                <thead>
+                  <tr style={{background: '#2ecc71'}}>
+                    <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {trabajadores.map(t => (
+                    <tr key={t.id}>
+                      <td>{t.id}</td>
+                      <td><strong>{t.nombre}</strong></td>
+                      <td>{t.dni}</td>
+                      <td>{t.telefono}</td>
+                      <td>{t.estado}</td>
+                      <td>
+                        <button onClick={() => eliminarTrabajador(t.id)} className="btn-delete">
+                          🗑️ Borrar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
-        {/* ================= 3. ASISTENCIAS (AHORA CON FILTRO) ================= */}
+        {/* ================= 3. ASISTENCIAS ================= */}
         {seccionActiva === 'asistencias' && (
           <section className="no-print">
             
-            {/* NUEVO: Encabezado y filtro de horas igual que el de gastos */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
               <h2 style={{ color: '#2c3e50', margin: 0 }}>🕒 Registro de Horas</h2>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="filtro-container">
                 <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar por Trabajador:</label>
                 <select 
                   className="input-standard" 
@@ -365,7 +402,6 @@ function App() {
               </div>
             </div>
 
-            {/* NUEVO: Cuadro resumen que solo sale si has filtrado a alguien */}
             {filtroTrabajadorAsis && (
               <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', border: '1px solid #ffeeba', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Total horas de {getNombreTrabajador(parseInt(filtroTrabajadorAsis))}:</span>
@@ -377,120 +413,128 @@ function App() {
               <input className="input-standard" type="date" value={fechaAsistencia} onChange={e=>setFechaAsistencia(e.target.value)} required />
               <select className="input-standard" value={idTrabajadorSel} onChange={e=>setIdTrabajadorSel(e.target.value)} required><option value="">-- Trabajador --</option>{trabajadores.map(t=><option key={t.id} value={t.id}>{t.nombre}</option>)}</select>
               <select className="input-standard" value={idObraSelAsis} onChange={e=>setIdObraSelAsis(e.target.value)} required><option value="">-- Obra --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
-              <div style={{display:'flex', gap:'10px'}}>
-                <input className="input-standard" style={{width:'100%'}} type="number" step="0.5" placeholder="Horas" value={horas} onChange={e=>setHoras(e.target.value)} required />
-                <button type="submit" className="btn-action" style={{backgroundColor: '#f39c12', width:'100%'}}>Registrar</button>
+              <div style={{display:'flex', gap:'10px', width: '100%'}}>
+                <input className="input-standard" style={{flex: 1}} type="number" step="0.5" placeholder="Horas" value={horas} onChange={e=>setHoras(e.target.value)} required />
+                <button type="submit" className="btn-action" style={{backgroundColor: '#f39c12', flex: 1}}>Registrar</button>
               </div>
             </form>
-            <table className="tabla-general">
-              <thead><tr style={{background: '#f39c12'}}><th>Fecha</th><th>Trabajador</th><th>Obra</th><th>Horas</th></tr></thead>
-              <tbody>
-                {/* NUEVO: Mapeamos asistenciasFiltradas en lugar de asistencias completas */}
-                {asistenciasFiltradas.length === 0 ? (
-                  <tr><td colSpan="4" style={{textAlign:'center', color:'#95a5a6'}}>No hay horas registradas para esta selección.</td></tr>
-                ) : (
-                  asistenciasFiltradas.map(a => (
-                    <tr key={a.id}>
-                      <td>{a.fecha}</td>
-                      <td><strong>{getNombreTrabajador(a.idTrabajador)}</strong></td>
-                      <td>{getNombreObra(a.idObra)}</td>
-                      <td style={{ fontWeight: 'bold' }}>{a.horasTrabajadas} h</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-general">
+                <thead><tr style={{background: '#f39c12'}}><th>Fecha</th><th>Trabajador</th><th>Obra</th><th>Horas</th></tr></thead>
+                <tbody>
+                  {asistenciasFiltradas.length === 0 ? (
+                    <tr><td colSpan="4" style={{textAlign:'center', color:'#95a5a6'}}>No hay horas registradas para esta selección.</td></tr>
+                  ) : (
+                    asistenciasFiltradas.map(a => (
+                      <tr key={a.id}>
+                        <td>{a.fecha}</td>
+                        <td><strong>{getNombreTrabajador(a.idTrabajador)}</strong></td>
+                        <td>{getNombreObra(a.idObra)}</td>
+                        <td style={{ fontWeight: 'bold' }}>{a.horasTrabajadas} h</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
-        {/* ================= 4. GASTOS Y PRESUPUESTOS (CON FILTRO) ================= */}
+        {/* ================= 4. GASTOS Y PRESUPUESTOS ================= */}
         {seccionActiva === 'gastos' && (
           <section className="no-print">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
-              <h2 style={{ color: '#2c3e50', margin: 0 }}>📊 Presupuestos y Beneficios</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar Resultados por Obra:</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
+              <h2 style={{ color: '#2c3e50', margin: 0 }}>📊 Presupuestos</h2>
+              <div className="filtro-container">
+                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar Resultados:</label>
                 <select 
                   className="input-standard" 
                   style={{ width: '300px', backgroundColor: '#e1f5fe', borderColor: '#81d4fa', fontWeight: 'bold' }}
                   value={filtroObraGastos} 
                   onChange={e => setFiltroObraGastos(e.target.value)}
                 >
-                  <option value="">-- Todas las Obras (Resumen Global) --</option>
+                  <option value="">-- Todas las Obras (Global) --</option>
                   {obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra} - {o.cliente}</option>)}
                 </select>
               </div>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '25px' }}>
+            <div className="tarjetas-resultados" style={{marginBottom: '25px'}}>
               <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #e74c3c' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>GASTOS (NETO)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#e74c3c'}}>{totalGastosNeto.toFixed(2)} €</h3></div>
-              <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #3498db' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>INGRESOS PROYECTADOS (PVP)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#3498db'}}>{totalFacturadoPvp.toFixed(2)} €</h3></div>
+              <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #3498db' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>INGRESOS (PVP)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#3498db'}}>{totalFacturadoPvp.toFixed(2)} €</h3></div>
               <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #2ecc71', backgroundColor: beneficioTotal >= 0 ? '#f0fff4' : '#fff5f5' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>BENEFICIO BRUTO</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color: beneficioTotal >= 0 ? '#2ecc71' : '#e74c3c'}}>{beneficioTotal.toFixed(2)} €</h3></div>
             </div>
 
-            <form onSubmit={guardarGasto} className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <form onSubmit={guardarGasto} className="form-grid">
               <select className="input-standard" value={idObraSelGasto} onChange={e=>setIdObraSelGasto(e.target.value)} required><option value="">-- Obra a facturar --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
               <select className="input-standard" value={categoria} onChange={e=>setCategoria(e.target.value)} required><option value="">-- Categoría --</option><option value="Materiales">Materiales</option><option value="Mano de Obra">Mano de Obra</option><option value="Varios">Varios</option></select>
               <input className="input-standard" type="date" value={fechaGasto} onChange={e=>setFechaGasto(e.target.value)} required />
               <input className="input-standard" placeholder="Proveedor / Tienda" value={provTrabajador} onChange={e=>setProvTrabajador(e.target.value)} />
-              <input className="input-standard" placeholder="Descripción del ticket o factura" value={descripcion} onChange={e=>setDescripcion(e.target.value)} style={{ gridColumn: 'span 2' }} />
-              <input className="input-standard" type="number" step="0.01" placeholder="Neto €" value={precioNeto} onChange={e=>setPrecioNeto(e.target.value)} style={{borderColor: '#e74c3c'}} />
-              <input className="input-standard" type="number" step="0.01" placeholder="PVP €" value={precioPvp} onChange={e=>setPrecioPvp(e.target.value)} style={{borderColor: '#3498db'}} />
-              <button type="submit" className="btn-action" style={{backgroundColor: '#e74c3c', gridColumn: 'span 4'}}>Registrar Gasto</button>
+              
+              {/* En móviles estos ocuparán 1 columna entera de todos modos por el media query */}
+              <input className="input-standard" placeholder="Descripción del ticket o factura" value={descripcion} onChange={e=>setDescripcion(e.target.value)} style={{ gridColumn: '1 / -1' }} />
+              
+              <div style={{display: 'flex', gap: '15px', gridColumn: '1 / -1'}}>
+                <input className="input-standard" type="number" step="0.01" placeholder="Neto €" value={precioNeto} onChange={e=>setPrecioNeto(e.target.value)} style={{borderColor: '#e74c3c', flex: 1}} />
+                <input className="input-standard" type="number" step="0.01" placeholder="PVP €" value={precioPvp} onChange={e=>setPrecioPvp(e.target.value)} style={{borderColor: '#3498db', flex: 1}} />
+              </div>
+              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#e74c3c', gridColumn: '1 / -1'}}>Registrar Gasto</button>
             </form>
 
-            <table className="tabla-general">
-              <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th></tr></thead>
-              <tbody>
-                {gastosFiltrados.length === 0 ? (
-                  <tr><td colSpan="5" style={{textAlign:'center', color:'#95a5a6'}}>No hay gastos registrados para esta selección.</td></tr>
-                ) : (
-                  gastosFiltrados.map(g => (
-                    <tr key={g.id}>
-                      <td>{g.fecha}</td>
-                      <td><strong>{getNombreObra(g.idObra)}</strong> <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.categoria}</span></td>
-                      <td>{g.descripcion} <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.provTrabajador}</span></td>
-                      <td style={{color: '#e74c3c', fontWeight:'bold'}}>{g.precioNeto}€</td>
-                      <td style={{color: '#2980b9', fontWeight:'bold'}}>{g.precioPvp}€</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-general">
+                <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th></tr></thead>
+                <tbody>
+                  {gastosFiltrados.length === 0 ? (
+                    <tr><td colSpan="5" style={{textAlign:'center', color:'#95a5a6'}}>No hay gastos registrados para esta selección.</td></tr>
+                  ) : (
+                    gastosFiltrados.map(g => (
+                      <tr key={g.id}>
+                        <td>{g.fecha}</td>
+                        <td><strong>{getNombreObra(g.idObra)}</strong> <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.categoria}</span></td>
+                        <td>{g.descripcion} <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.provTrabajador}</span></td>
+                        <td style={{color: '#e74c3c', fontWeight:'bold'}}>{g.precioNeto}€</td>
+                        <td style={{color: '#2980b9', fontWeight:'bold'}}>{g.precioPvp}€</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
-        {/* ================= 5. INFORMES / CUADRANTE EDITABLE ================= */}
+        {/* ================= 5. INFORMES ================= */}
         {seccionActiva === 'informes' && (
           <section>
-            <div className="no-print" style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #eee', display: 'flex', gap: '15px', alignItems: 'flex-end' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Seleccionar Trabajador:</label>
+            <div className="no-print" style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #eee', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="filtro-container">
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Trabajador:</label>
                 <select className="input-standard" value={trabajadorFiltro} onChange={e => setTrabajadorFiltro(e.target.value)}>
                   <option value="">-- Elige un trabajador --</option>
                   {trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="filtro-container">
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Mes del Cuadrante:</label>
                 <input className="input-standard" type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} />
               </div>
               
               {trabajadorFiltro && (
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-                  <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#3498db' }}>💾 GUARDAR DATOS</button>
-                  <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad' }}>🖨️ IMPRIMIR FOLIO</button>
+                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                  <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#3498db', flex: 1, padding: '10px 5px', fontSize: '12px' }}>💾 GUARDAR</button>
+                  <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad', flex: 1, padding: '10px 5px', fontSize: '12px' }}>🖨️ IMPRIMIR</button>
                 </div>
               )}
             </div>
 
             {trabajadorFiltro ? (
-              <div style={{ marginTop: '10px' }}>
+              <div style={{ marginTop: '10px', overflowX: 'auto' }}>
                 <h3 style={{ textAlign: 'center', fontSize: '18px', margin: '0 0 15px 0', textTransform: 'uppercase' }}>
                   PARTE DE TRABAJO - {getNombreTrabajador(parseInt(trabajadorFiltro))} ({mesFiltro})
                 </h3>
                 
-                <table className="tabla-papel" style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', textAlign: 'center' }}>
+                <table className="tabla-papel" style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', textAlign: 'center', minWidth: '700px' }}>
                   <thead>
                     <tr style={{ background: '#f0f0f0' }}>
                       <th style={{ border: '1px solid black', padding: '6px', width: '3%' }}>Día</th>
@@ -543,7 +587,7 @@ function App() {
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#95a5a6', border: '2px dashed #ecf0f1', borderRadius: '10px' }}>
-                <h3>👆 Selecciona un trabajador y un mes en el menú superior para cargar la hoja de cálculo.</h3>
+                <h3>👆 Selecciona un trabajador y un mes para cargar la hoja de cálculo.</h3>
               </div>
             )}
           </section>
