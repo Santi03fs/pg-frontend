@@ -12,7 +12,7 @@ const LogoPG = () => (
 );
 
 function App() {
-  const [seccionActiva, setSeccionActiva] = useState('gastos'); // Te lo dejo en gastos por defecto para que lo pruebes
+  const [seccionActiva, setSeccionActiva] = useState('trabajadores'); 
 
   // ================= ESTADOS GENERALES =================
   const [obras, setObras] = useState([]);
@@ -48,7 +48,6 @@ function App() {
   const [trabajadorFiltro, setTrabajadorFiltro] = useState('');
   const [cuadrante, setCuadrante] = useState([]); 
   
-  // NUEVO: Filtro para la pestaña de presupuestos
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
 
 // ================= CARGA DE DATOS =================
@@ -146,15 +145,14 @@ function App() {
     .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); }); 
   };
   
-  // NUEVO: Función para cambiar el estado de la obra con el Switch
   const toggleEstadoObra = async (id, estadoActual) => {
     try {
       await fetch(`https://pg-backend-v364.onrender.com/api/obras/${id}/estado`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(!estadoActual) // Enviamos el estado contrario
+        body: JSON.stringify(!estadoActual)
       });
-      cargarObras(); // Refrescamos la tabla instantáneamente
+      cargarObras(); 
     } catch (error) {
       console.error("Error al cambiar el estado de la obra:", error);
     }
@@ -164,6 +162,28 @@ function App() {
     e.preventDefault(); 
     fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombreTrabajador, dni, telefono, estado: 'Activo' }) })
     .then(() => { setNombreTrabajador(''); setDni(''); setTelefono(''); cargarTrabajadores(); }); 
+  };
+
+  // NUEVO: Función para eliminar trabajador de la base de datos
+  const eliminarTrabajador = async (id) => {
+    // 1. Pedir confirmación para evitar borrados accidentales
+    if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar a este trabajador?")) {
+      try {
+        const response = await fetch(`https://pg-backend-v364.onrender.com/api/trabajadores/${id}`, {
+          method: 'DELETE'
+        });
+        
+        // 2. Si el borrado funciona, actualizamos la tabla
+        if (response.ok) {
+          cargarTrabajadores();
+        } else {
+          // 3. Si la base de datos bloquea el borrado por tener horas asignadas
+          alert("❌ No se puede eliminar a este trabajador porque ya tiene partes de horas registrados en alguna obra.");
+        }
+      } catch (error) {
+        console.error("Error al intentar eliminar el trabajador:", error);
+      }
+    }
   };
   
   const guardarAsistencia = (e) => { 
@@ -182,12 +202,10 @@ function App() {
   const getNombreObra = (id) => obras.find(o => o.id === id)?.nombreObra || '';
   const getNombreTrabajador = (id) => trabajadores.find(t => t.id === id)?.nombre || 'Desconocido';
   
-  // Magia de filtrado: Si hay una obra seleccionada en el filtro, nos quedamos solo con esos gastos
   const gastosFiltrados = filtroObraGastos 
     ? gastos.filter(g => g.idObra === parseInt(filtroObraGastos)) 
     : gastos;
 
-  // Calculamos los totales usando SOLO los gastos filtrados
   const totalGastosNeto = gastosFiltrados.reduce((s, g) => s + (g.precioNeto || 0), 0);
   const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
   const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
@@ -217,15 +235,18 @@ function App() {
         .tabla-general td { padding: 12px; border-bottom: 1px solid #f0f0f0; }
         .input-standard { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
         
-        /* NUEVO: Estilos para el Switch */
         .switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .switch-input { width: 40px; height: 20px; appearance: none; background: #e74c3c; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: 0.3s; }
         .switch-input:checked { background: #2ecc71; }
         .switch-input::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .switch-input:checked::before { transform: translateX(20px); }
+        
+        /* NUEVO: Estilo para el botón de borrar */
+        .btn-delete { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-delete:hover { background-color: #ff6b81; }
       `}</style>
 
-      {/* CABECERA (NO SE IMPRIME) */}
+      {/* CABECERA */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', backgroundColor: 'white', padding: '15px 25px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <LogoPG /> 
@@ -254,11 +275,9 @@ function App() {
               <button type="submit" className="btn-action" style={{backgroundColor: '#3498db'}}>Añadir Obra</button>
             </form>
             <table className="tabla-general">
-              {/* NUEVO: Columna Estado en los títulos de la tabla */}
               <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th></tr></thead>
               <tbody>
                 {obras.map(o => (
-                  // NUEVO: Fila entera con estilo si está acabada y el interruptor visual
                   <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
                     <td>{o.id}</td>
                     <td>{o.cliente}</td>
@@ -295,8 +314,29 @@ function App() {
               <button type="submit" className="btn-action" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
             </form>
             <table className="tabla-general">
-              <thead><tr style={{background: '#2ecc71'}}><th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th></tr></thead>
-              <tbody>{trabajadores.map(t => <tr key={t.id}><td>{t.id}</td><td><strong>{t.nombre}</strong></td><td>{t.dni}</td><td>{t.telefono}</td><td>{t.estado}</td></tr>)}</tbody>
+              {/* NUEVO: Columna "Acciones" añadida a la cabecera */}
+              <thead>
+                <tr style={{background: '#2ecc71'}}>
+                  <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trabajadores.map(t => (
+                  <tr key={t.id}>
+                    <td>{t.id}</td>
+                    <td><strong>{t.nombre}</strong></td>
+                    <td>{t.dni}</td>
+                    <td>{t.telefono}</td>
+                    <td>{t.estado}</td>
+                    {/* NUEVO: Botón de borrar en cada fila */}
+                    <td>
+                      <button onClick={() => eliminarTrabajador(t.id)} className="btn-delete">
+                        🗑️ Borrar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </section>
         )}
@@ -324,11 +364,8 @@ function App() {
         {/* ================= 4. GASTOS Y PRESUPUESTOS (CON FILTRO) ================= */}
         {seccionActiva === 'gastos' && (
           <section className="no-print">
-            
-            {/* ENCABEZADO Y FILTRO DE OBRA */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
               <h2 style={{ color: '#2c3e50', margin: 0 }}>📊 Presupuestos y Beneficios</h2>
-              
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar Resultados por Obra:</label>
                 <select 
@@ -343,14 +380,12 @@ function App() {
               </div>
             </div>
             
-            {/* TARJETAS DE RESULTADOS (Se actualizan según el filtro) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '25px' }}>
               <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #e74c3c' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>GASTOS (NETO)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#e74c3c'}}>{totalGastosNeto.toFixed(2)} €</h3></div>
               <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #3498db' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>INGRESOS PROYECTADOS (PVP)</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color:'#3498db'}}>{totalFacturadoPvp.toFixed(2)} €</h3></div>
               <div style={{ background: 'white', padding: '20px', borderRadius: '10px', border: '1px solid #eee', borderLeft: '5px solid #2ecc71', backgroundColor: beneficioTotal >= 0 ? '#f0fff4' : '#fff5f5' }}><p style={{margin:0, color:'#7f8c8d', fontSize:'12px', fontWeight:'bold'}}>BENEFICIO BRUTO</p><h3 style={{margin:'5px 0 0 0', fontSize:'24px', color: beneficioTotal >= 0 ? '#2ecc71' : '#e74c3c'}}>{beneficioTotal.toFixed(2)} €</h3></div>
             </div>
 
-            {/* FORMULARIO PARA AÑADIR GASTO */}
             <form onSubmit={guardarGasto} className="form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
               <select className="input-standard" value={idObraSelGasto} onChange={e=>setIdObraSelGasto(e.target.value)} required><option value="">-- Obra a facturar --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
               <select className="input-standard" value={categoria} onChange={e=>setCategoria(e.target.value)} required><option value="">-- Categoría --</option><option value="Materiales">Materiales</option><option value="Mano de Obra">Mano de Obra</option><option value="Varios">Varios</option></select>
@@ -362,7 +397,6 @@ function App() {
               <button type="submit" className="btn-action" style={{backgroundColor: '#e74c3c', gridColumn: 'span 4'}}>Registrar Gasto</button>
             </form>
 
-            {/* TABLA (Muestra solo los gastos filtrados) */}
             <table className="tabla-general">
               <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th></tr></thead>
               <tbody>
