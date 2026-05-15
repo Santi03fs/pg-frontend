@@ -12,7 +12,7 @@ const LogoPG = () => (
 );
 
 function App() {
-  const [seccionActiva, setSeccionActiva] = useState('trabajadores'); 
+  const [seccionActiva, setSeccionActiva] = useState('asistencias'); 
 
   // ================= ESTADOS GENERALES =================
   const [obras, setObras] = useState([]);
@@ -49,6 +49,8 @@ function App() {
   const [cuadrante, setCuadrante] = useState([]); 
   
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
+  // NUEVO: Estado para el filtro de horas por trabajador
+  const [filtroTrabajadorAsis, setFiltroTrabajadorAsis] = useState('');
 
 // ================= CARGA DE DATOS =================
   useEffect(() => {
@@ -164,20 +166,16 @@ function App() {
     .then(() => { setNombreTrabajador(''); setDni(''); setTelefono(''); cargarTrabajadores(); }); 
   };
 
-  // NUEVO: Función para eliminar trabajador de la base de datos
   const eliminarTrabajador = async (id) => {
-    // 1. Pedir confirmación para evitar borrados accidentales
     if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar a este trabajador?")) {
       try {
         const response = await fetch(`https://pg-backend-v364.onrender.com/api/trabajadores/${id}`, {
           method: 'DELETE'
         });
         
-        // 2. Si el borrado funciona, actualizamos la tabla
         if (response.ok) {
           cargarTrabajadores();
         } else {
-          // 3. Si la base de datos bloquea el borrado por tener horas asignadas
           alert("❌ No se puede eliminar a este trabajador porque ya tiene partes de horas registrados en alguna obra.");
         }
       } catch (error) {
@@ -210,6 +208,13 @@ function App() {
   const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
   const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
 
+  // NUEVO: Filtro mágico para las horas y cálculo total
+  const asistenciasFiltradas = filtroTrabajadorAsis 
+    ? asistencias.filter(a => a.idTrabajador === parseInt(filtroTrabajadorAsis)) 
+    : asistencias;
+    
+  const totalHorasFiltradas = asistenciasFiltradas.reduce((suma, a) => suma + (a.horasTrabajadas || 0), 0);
+
   // ================= INTERFAZ =================
   return (
     <div style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', padding: '30px', fontFamily: '"Segoe UI", sans-serif' }}>
@@ -241,7 +246,6 @@ function App() {
         .switch-input::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .switch-input:checked::before { transform: translateX(20px); }
         
-        /* NUEVO: Estilo para el botón de borrar */
         .btn-delete { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-delete:hover { background-color: #ff6b81; }
       `}</style>
@@ -314,7 +318,6 @@ function App() {
               <button type="submit" className="btn-action" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
             </form>
             <table className="tabla-general">
-              {/* NUEVO: Columna "Acciones" añadida a la cabecera */}
               <thead>
                 <tr style={{background: '#2ecc71'}}>
                   <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
@@ -328,7 +331,6 @@ function App() {
                     <td>{t.dni}</td>
                     <td>{t.telefono}</td>
                     <td>{t.estado}</td>
-                    {/* NUEVO: Botón de borrar en cada fila */}
                     <td>
                       <button onClick={() => eliminarTrabajador(t.id)} className="btn-delete">
                         🗑️ Borrar
@@ -341,10 +343,36 @@ function App() {
           </section>
         )}
 
-        {/* ================= 3. ASISTENCIAS ================= */}
+        {/* ================= 3. ASISTENCIAS (AHORA CON FILTRO) ================= */}
         {seccionActiva === 'asistencias' && (
           <section className="no-print">
-            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>🕒 Registro Rápido de Horas</h2>
+            
+            {/* NUEVO: Encabezado y filtro de horas igual que el de gastos */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
+              <h2 style={{ color: '#2c3e50', margin: 0 }}>🕒 Registro de Horas</h2>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar por Trabajador:</label>
+                <select 
+                  className="input-standard" 
+                  style={{ width: '300px', backgroundColor: '#fff9c4', borderColor: '#fbc02d', fontWeight: 'bold' }}
+                  value={filtroTrabajadorAsis} 
+                  onChange={e => setFiltroTrabajadorAsis(e.target.value)}
+                >
+                  <option value="">-- Todos los Trabajadores --</option>
+                  {trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* NUEVO: Cuadro resumen que solo sale si has filtrado a alguien */}
+            {filtroTrabajadorAsis && (
+              <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', border: '1px solid #ffeeba', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Total horas de {getNombreTrabajador(parseInt(filtroTrabajadorAsis))}:</span>
+                <span style={{ fontSize: '20px' }}>{totalHorasFiltradas} h</span>
+              </div>
+            )}
+
             <form onSubmit={guardarAsistencia} className="form-grid">
               <input className="input-standard" type="date" value={fechaAsistencia} onChange={e=>setFechaAsistencia(e.target.value)} required />
               <select className="input-standard" value={idTrabajadorSel} onChange={e=>setIdTrabajadorSel(e.target.value)} required><option value="">-- Trabajador --</option>{trabajadores.map(t=><option key={t.id} value={t.id}>{t.nombre}</option>)}</select>
@@ -356,7 +384,21 @@ function App() {
             </form>
             <table className="tabla-general">
               <thead><tr style={{background: '#f39c12'}}><th>Fecha</th><th>Trabajador</th><th>Obra</th><th>Horas</th></tr></thead>
-              <tbody>{asistencias.map(a => <tr key={a.id}><td>{a.fecha}</td><td>{getNombreTrabajador(a.idTrabajador)}</td><td>{getNombreObra(a.idObra)}</td><td>{a.horasTrabajadas} h</td></tr>)}</tbody>
+              <tbody>
+                {/* NUEVO: Mapeamos asistenciasFiltradas en lugar de asistencias completas */}
+                {asistenciasFiltradas.length === 0 ? (
+                  <tr><td colSpan="4" style={{textAlign:'center', color:'#95a5a6'}}>No hay horas registradas para esta selección.</td></tr>
+                ) : (
+                  asistenciasFiltradas.map(a => (
+                    <tr key={a.id}>
+                      <td>{a.fecha}</td>
+                      <td><strong>{getNombreTrabajador(a.idTrabajador)}</strong></td>
+                      <td>{getNombreObra(a.idObra)}</td>
+                      <td style={{ fontWeight: 'bold' }}>{a.horasTrabajadas} h</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </section>
         )}
