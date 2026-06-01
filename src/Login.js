@@ -16,25 +16,44 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
     
-    // Credenciales propuestas: admin / pg2026
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    if (cleanUser === 'admin' && cleanPass === 'pg2026') {
-      setError('');
-      // Guardar sesión
-      if (rememberMe) {
-        localStorage.setItem('pg_session', 'authenticated');
+    try {
+      const response = await fetch('https://pg-backend-v364.onrender.com/api/usuarios/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass })
+      });
+
+      if (response.ok) {
+        const userObj = await response.json();
+        
+        if (rememberMe) {
+          localStorage.setItem('pg_session', 'authenticated');
+          localStorage.setItem('pg_user', JSON.stringify(userObj));
+        } else {
+          sessionStorage.setItem('pg_session', 'authenticated');
+          sessionStorage.setItem('pg_user', JSON.stringify(userObj));
+        }
+        
+        onLoginSuccess(userObj);
       } else {
-        sessionStorage.setItem('pg_session', 'authenticated');
+        const msg = await response.text();
+        setError(msg || '⚠️ Usuario o contraseña incorrectos.');
       }
-      onLoginSuccess();
-    } else {
-      setError('⚠️ Usuario o contraseña incorrectos. Inténtalo de nuevo.');
+    } catch (err) {
+      console.error(err);
+      setError('❌ Error de conexión con el servidor. Inténtalo de nuevo (Render puede tardar en arrancar).');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -378,8 +397,8 @@ export default function Login({ onLoginSuccess }) {
           </div>
 
           {/* Botón de envío */}
-          <button type="submit" className="btn-submit">
-            Iniciar Sesión
+          <button type="submit" className="btn-submit" disabled={loading}>
+            {loading ? '⏳ Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
 

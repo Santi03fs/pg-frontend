@@ -16,10 +16,18 @@ const LogoPG = () => (
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [usuarioActual, setUsuarioActual] = useState(null);
   const [seccionActiva, setSeccionActiva] = useState('obras'); 
 
   // ================= ESTADOS GENERALES =================
   const [obras, setObras] = useState([]);
+
+  // ================= ESTADOS USUARIOS =================
+  const [usuarios, setUsuarios] = useState([]);
+  const [usernameNuevo, setUsernameNuevo] = useState('');
+  const [passwordNuevo, setPasswordNuevo] = useState('');
+  const [rolNuevo, setRolNuevo] = useState('USER');
+  const [nombreNuevo, setNombreNuevo] = useState('');
   const [trabajadores, setTrabajadores] = useState([]);
   const [asistencias, setAsistencias] = useState([]);
   const [gastos, setGastos] = useState([]);
@@ -60,6 +68,10 @@ function App() {
     const session = localStorage.getItem('pg_session') || sessionStorage.getItem('pg_session');
     if (session === 'authenticated') {
       setIsAuthenticated(true);
+      const userStored = localStorage.getItem('pg_user') || sessionStorage.getItem('pg_user');
+      if (userStored) {
+        setUsuarioActual(JSON.parse(userStored));
+      }
     }
   }, []);
 
@@ -72,7 +84,10 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('pg_session');
+    localStorage.removeItem('pg_user');
     sessionStorage.removeItem('pg_session');
+    sessionStorage.removeItem('pg_user');
+    setUsuarioActual(null);
     setIsAuthenticated(false);
   };
 
@@ -81,6 +96,70 @@ function App() {
     cargarTrabajadores(); 
     cargarAsistencias(); 
     cargarGastos();
+    
+    // Cargar usuarios si es admin
+    const userStored = localStorage.getItem('pg_user') || sessionStorage.getItem('pg_user');
+    if (userStored) {
+      const u = JSON.parse(userStored);
+      if (u.rol === 'ADMIN') {
+        fetch('https://pg-backend-v364.onrender.com/api/usuarios')
+          .then(res => res.json())
+          .then(setUsuarios)
+          .catch(err => console.error("Error al cargar usuarios inicial:", err));
+      }
+    }
+  };
+
+  const cargarUsuarios = () => {
+    fetch('https://pg-backend-v364.onrender.com/api/usuarios')
+      .then(res => res.json())
+      .then(setUsuarios)
+      .catch(err => console.error("Error al cargar usuarios:", err));
+  };
+
+  const guardarUsuario = (e) => {
+    e.preventDefault();
+    const payload = {
+      username: usernameNuevo,
+      password: passwordNuevo,
+      rol: rolNuevo,
+      nombre: nombreNuevo
+    };
+
+    fetch('https://pg-backend-v364.onrender.com/api/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(async res => {
+      if (res.ok) {
+        setUsernameNuevo('');
+        setPasswordNuevo('');
+        setRolNuevo('USER');
+        setNombreNuevo('');
+        cargarUsuarios();
+      } else {
+        const errorMsg = await res.text();
+        alert(errorMsg || "Error al registrar el usuario");
+      }
+    })
+    .catch(err => console.error("Error al guardar usuario:", err));
+  };
+
+  const eliminarUsuario = (id) => {
+    if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar a este usuario?")) {
+      fetch(`https://pg-backend-v364.onrender.com/api/usuarios/${id}`, {
+        method: 'DELETE'
+      })
+      .then(res => {
+        if (res.ok) {
+          cargarUsuarios();
+        } else {
+          alert("Error al intentar eliminar el usuario");
+        }
+      })
+      .catch(err => console.error("Error al eliminar usuario:", err));
+    }
   };
 
   const cargarObras = () => fetch('https://pg-backend-v364.onrender.com/api/obras').then(res => res.json()).then(setObras);
@@ -353,7 +432,10 @@ function App() {
 
   // ================= INTERFAZ =================
   if (!isAuthenticated) {
-    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return <Login onLoginSuccess={(user) => {
+      setIsAuthenticated(true);
+      setUsuarioActual(user);
+    }} />;
   }
 
   return (
@@ -432,7 +514,10 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <LogoPG /> 
           <div className="separador-header" style={{width: '1px', height: '40px', background: '#ddd', margin: '0 10px'}}></div> 
-          <h2 style={{margin:0, fontSize:'20px', color: '#2c3e50'}}>GESTIÓN CONSTRUCTORA</h2>
+          <div>
+            <h2 style={{margin:0, fontSize:'20px', color: '#2c3e50'}}>GESTIÓN CONSTRUCTORA</h2>
+            {usuarioActual && <span style={{fontSize:'12px', color:'#7f8c8d', fontWeight:'600'}}>👤 Sesión: {usuarioActual.nombre} ({usuarioActual.rol})</span>}
+          </div>
         </div>
         <div className="nav-buttons">
           <button onClick={() => setSeccionActiva('obras')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'obras' ? '#3498db' : '#ecf0f1', color: seccionActiva === 'obras' ? 'white' : '#7f8c8d' }}>Obras</button>
@@ -440,6 +525,9 @@ function App() {
           <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
           <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Gastos</button>
           <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Partes</button>
+          {usuarioActual?.rol === 'ADMIN' && (
+            <button onClick={() => setSeccionActiva('usuarios')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'usuarios' ? '#9b59b6' : '#ecf0f1', color: seccionActiva === 'usuarios' ? 'white' : '#7f8c8d' }}>⚙️ Usuarios</button>
+          )}
           <button onClick={handleLogout} className="btn-nav btn-logout-header" style={{ backgroundColor: '#ffebeb', color: '#c0392b', border: '1px solid #ffcccc' }}>🔒 Salir</button>
         </div>
       </div>
@@ -738,6 +826,63 @@ function App() {
                 <h3>👆 Selecciona un trabajador y un mes para cargar la hoja de cálculo.</h3>
               </div>
             )}
+          </section>
+        )}
+
+        {/* ================= 6. GESTIÓN DE USUARIOS (ADMIN ONLY) ================= */}
+        {seccionActiva === 'usuarios' && usuarioActual?.rol === 'ADMIN' && (
+          <section className="no-print">
+            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>⚙️ Gestión de Usuarios (Administrador)</h2>
+            <form onSubmit={guardarUsuario} className="form-grid">
+              <input className="input-standard" placeholder="Nombre completo" value={nombreNuevo} onChange={e=>setNombreNuevo(e.target.value)} required />
+              <input className="input-standard" placeholder="Usuario (Ej: juan123)" value={usernameNuevo} onChange={e=>setUsernameNuevo(e.target.value)} required />
+              <input className="input-standard" type="password" placeholder="Contraseña" value={passwordNuevo} onChange={e=>setPasswordNuevo(e.target.value)} required />
+              <select className="input-standard" value={rolNuevo} onChange={e=>setRolNuevo(e.target.value)} required>
+                <option value="USER">Usuario Estándar (USER)</option>
+                <option value="ADMIN">Administrador (ADMIN)</option>
+              </select>
+              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#9b59b6', gridColumn: '1 / -1'}}>Crear Nuevo Usuario</button>
+            </form>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-general">
+                <thead>
+                  <tr style={{background: '#9b59b6'}}>
+                    <th>ID</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Contraseña</th><th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuarios.map(u => (
+                    <tr key={u.id}>
+                      <td>{u.id}</td>
+                      <td><strong>{u.nombre}</strong></td>
+                      <td><code>{u.username}</code></td>
+                      <td>
+                        <span style={{ 
+                          padding: '4px 8px', 
+                          borderRadius: '12px', 
+                          fontSize: '11px', 
+                          fontWeight: 'bold', 
+                          color: 'white',
+                          backgroundColor: u.rol === 'ADMIN' ? '#e74c3c' : '#3498db'
+                        }}>
+                          {u.rol}
+                        </span>
+                      </td>
+                      <td><span style={{fontFamily:'monospace', color:'#888'}}>••••••••</span></td>
+                      <td>
+                        {u.username === usuarioActual.username ? (
+                          <span style={{fontSize:'12px', color:'#7f8c8d', fontStyle:'italic'}}>Sesión Activa</span>
+                        ) : (
+                          <button onClick={() => eliminarUsuario(u.id)} className="btn-delete">
+                            🗑️ Borrar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
