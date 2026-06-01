@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import './App.css';
+import Login from './Login';
+
 
 // ================= LOGOTIPO GRUPO PG =================
 const LogoPG = () => (
@@ -13,6 +15,7 @@ const LogoPG = () => (
 );
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState('obras'); 
 
   // ================= ESTADOS GENERALES =================
@@ -54,9 +57,25 @@ function App() {
 
 // ================= CARGA DE DATOS =================
   useEffect(() => {
-    cargarTodo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const session = localStorage.getItem('pg_session') || sessionStorage.getItem('pg_session');
+    if (session === 'authenticated') {
+      setIsAuthenticated(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      cargarTodo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('pg_session');
+    sessionStorage.removeItem('pg_session');
+    setIsAuthenticated(false);
+  };
+
   const cargarTodo = () => {
     cargarObras(); 
     cargarTrabajadores(); 
@@ -333,6 +352,10 @@ function App() {
   };
 
   // ================= INTERFAZ =================
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <div className="app-container" style={{ backgroundColor: '#f4f7fa', minHeight: '100vh', fontFamily: '"Segoe UI", sans-serif' }}>
       
@@ -372,6 +395,9 @@ function App() {
 
         .btn-excel { background-color: #10ac84; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
         .btn-excel:hover { background-color: #1dd1a1; box-shadow: 0 2px 5px rgba(29, 209, 161, 0.4); }
+
+        .btn-logout-header { transition: 0.2s; }
+        .btn-logout-header:hover { background-color: #c0392b !important; color: white !important; border-color: #c0392b !important; box-shadow: 0 2px 5px rgba(192, 57, 43, 0.4); }
 
         .tarjetas-resultados { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; marginBottom: 25px; }
         .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background-color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -414,6 +440,7 @@ function App() {
           <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
           <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Gastos</button>
           <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Partes</button>
+          <button onClick={handleLogout} className="btn-nav btn-logout-header" style={{ backgroundColor: '#ffebeb', color: '#c0392b', border: '1px solid #ffcccc' }}>🔒 Salir</button>
         </div>
       </div>
 
