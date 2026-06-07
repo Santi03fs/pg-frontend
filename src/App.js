@@ -4,6 +4,12 @@ import './App.css';
 import Login from './Login';
 
 
+
+// Dynamic API Base URL depending on environment
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8080'
+  : `${API_BASE_URL}`;
+
 // ================= LOGOTIPO GRUPO PG =================
 const LogoPG = () => (
   <svg height="50" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', maxWidth: '100%' }}>
@@ -113,7 +119,7 @@ function App() {
     if (userStored) {
       const u = JSON.parse(userStored);
       if (u.rol === 'ADMIN') {
-        fetch('https://pg-backend-v364.onrender.com/api/usuarios')
+        fetch(`${API_BASE_URL}/api/usuarios`)
           .then(res => res.json())
           .then(setUsuarios)
           .catch(err => console.error("Error al cargar usuarios inicial:", err));
@@ -122,7 +128,7 @@ function App() {
   };
 
   const cargarUsuarios = () => {
-    fetch('https://pg-backend-v364.onrender.com/api/usuarios')
+    fetch(`${API_BASE_URL}/api/usuarios`)
       .then(res => res.json())
       .then(setUsuarios)
       .catch(err => console.error("Error al cargar usuarios:", err));
@@ -137,7 +143,7 @@ function App() {
       nombre: nombreNuevo
     };
 
-    fetch('https://pg-backend-v364.onrender.com/api/usuarios', {
+    fetch(`${API_BASE_URL}/api/usuarios`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -159,7 +165,7 @@ function App() {
 
   const eliminarUsuario = (id) => {
     if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar a este usuario?")) {
-      fetch(`https://pg-backend-v364.onrender.com/api/usuarios/${id}`, {
+      fetch(`${API_BASE_URL}/api/usuarios/${id}`, {
         method: 'DELETE'
       })
       .then(res => {
@@ -173,10 +179,10 @@ function App() {
     }
   };
 
-  const cargarObras = () => fetch('https://pg-backend-v364.onrender.com/api/obras').then(res => res.json()).then(setObras);
-  const cargarTrabajadores = () => fetch('https://pg-backend-v364.onrender.com/api/trabajadores').then(res => res.json()).then(setTrabajadores);
-  const cargarAsistencias = () => fetch('https://pg-backend-v364.onrender.com/api/asistencias').then(res => res.json()).then(setAsistencias);
-  const cargarGastos = () => fetch('https://pg-backend-v364.onrender.com/api/gastos').then(res => res.json()).then(setGastos);
+  const cargarObras = () => fetch(`${API_BASE_URL}/api/obras`).then(res => res.json()).then(setObras);
+  const cargarTrabajadores = () => fetch(`${API_BASE_URL}/api/trabajadores`).then(res => res.json()).then(setTrabajadores);
+  const cargarAsistencias = () => fetch(`${API_BASE_URL}/api/asistencias`).then(res => res.json()).then(setAsistencias);
+  const cargarGastos = () => fetch(`${API_BASE_URL}/api/gastos`).then(res => res.json()).then(setGastos);
 
   // ================= HELPERS Y CÁLCULOS FILTRADOS =================
   const getNombreObra = (id) => obras.find(o => Number(o.id) === Number(id))?.nombreObra || '';
@@ -257,7 +263,7 @@ function App() {
         descripcion: dia.descripcionExtra
       };
       
-      await fetch('https://pg-backend-v364.onrender.com/api/asistencias', { 
+      await fetch(`${API_BASE_URL}/api/asistencias`, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload) 
@@ -430,25 +436,25 @@ function App() {
     // Validaciones
     for (const fila of filasDiario) {
       if (fila.estadoAsistencia === 'Presente') {
-        if (fila.obras.length === 0) {
+        if (!fila.obras || fila.obras.length === 0) {
           alert(`Falta asignar al menos una obra para ${fila.nombre} ya que está marcado como Presente.`);
           return;
         }
         for (let i = 0; i < fila.obras.length; i++) {
           const o = fila.obras[i];
-          if (!o.idObra) {
+          if (!o.idObra || o.idObra === '') {
             alert(`Falta seleccionar la Obra en la asignación ${i + 1} de ${fila.nombre}.`);
             return;
           }
-          if (!o.partida) {
+          if (!o.partida || o.partida === '') {
             alert(`Falta seleccionar la Partida en la asignación ${i + 1} de ${fila.nombre}.`);
             return;
           }
-          if (o.horasTrabajadas === '' || isNaN(parseFloat(o.horasTrabajadas))) {
+          if (o.horasTrabajadas === '' || o.horasTrabajadas === undefined || o.horasTrabajadas === null || isNaN(parseFloat(o.horasTrabajadas))) {
             alert(`Falta especificar las Horas en la asignación ${i + 1} de ${fila.nombre}.`);
             return;
           }
-          if (o.tipoPago === 'Personalizado' && (o.pagoDia === '' || isNaN(parseFloat(o.pagoDia)))) {
+          if (o.tipoPago === 'Personalizado' && (o.pagoDia === '' || o.pagoDia === undefined || o.pagoDia === null || isNaN(parseFloat(o.pagoDia)))) {
             alert(`Falta especificar el Pago Personalizado en la asignación ${i + 1} de ${fila.nombre}.`);
             return;
           }
@@ -459,20 +465,13 @@ function App() {
     setGuardando(true);
 
     try {
-      // 1. Borrar IDs
-      for (const idToDel of idsAEliminar) {
-        await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${idToDel}`, {
-          method: 'DELETE'
-        });
-      }
-      setIdsAEliminar([]);
-
-      // 2. Guardar registros actuales
+      // 1. Recopilar todos los registros que queremos guardar/actualizar en la base de datos
+      const registrosAGuardar = [];
+      
       for (const fila of filasDiario) {
         if (fila.estadoAsistencia === 'Presente') {
-          // Guardar cada obra
           for (const o of fila.obras) {
-            const payload = {
+            registrosAGuardar.push({
               id: o.idAsistencia || null,
               fecha: fechaControlDiario,
               idTrabajador: fila.idTrabajador,
@@ -485,25 +484,10 @@ function App() {
               descripcion: o.descripcion || "",
               tipoPago: o.tipoPago,
               pagoDia: parseFloat(o.pagoDia) || 0.0
-            };
-
-            await fetch('https://pg-backend-v364.onrender.com/api/asistencias', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
             });
           }
-
-          // Si antes tenía un registro raíz (ausencia) y ahora pasó a Presente, borrar el registro raíz
-          if (fila.idAsistenciaRaiz) {
-            await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${fila.idAsistenciaRaiz}`, {
-              method: 'DELETE'
-            });
-          }
-
         } else {
-          // Ausente, Vacaciones, Baja
-          const payload = {
+          registrosAGuardar.push({
             id: fila.idAsistenciaRaiz || null,
             fecha: fechaControlDiario,
             idTrabajador: fila.idTrabajador,
@@ -516,21 +500,46 @@ function App() {
             descripcion: "",
             tipoPago: "Normal",
             pagoDia: 0.0
-          };
-
-          await fetch('https://pg-backend-v364.onrender.com/api/asistencias', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
           });
+        }
+      }
 
-          // Si antes tenía obras (Presente) y ahora es Ausente/Vacaciones/Baja, borrar obras asociadas
-          const obrasPreviasConId = fila.obras.filter(o => o.idAsistencia !== null);
-          for (const op of obrasPreviasConId) {
-            await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${op.idAsistencia}`, {
-              method: 'DELETE'
-            });
-          }
+      // 2. Determinar qué registros antiguos en la base de datos deben ser eliminados
+      // Filtramos las asistencias actuales de este día en el estado global para saber qué había en BD
+      const asistenciasDiaOriginal = asistencias.filter(a => a.fecha === fechaControlDiario);
+      
+      // Obtenemos los IDs de las asistencias que ya existían en BD para este día
+      const idsExistentesBD = asistenciasDiaOriginal.map(a => a.id).filter(id => id !== null && id !== undefined);
+      
+      // Obtenemos los IDs de los registros que vamos a mantener/actualizar
+      const idsAMantener = registrosAGuardar.map(r => r.id).filter(id => id !== null && id !== undefined);
+      
+      // Los que estaban en BD pero no están en la lista a mantener deben ser eliminados
+      const idsAEliminarCalculados = idsExistentesBD.filter(id => !idsAMantener.includes(id));
+
+      // 3. Eliminar los registros sobrantes en la base de datos
+      for (const idToDel of idsAEliminarCalculados) {
+        const res = await fetch(`${API_BASE_URL}/api/asistencias/${idToDel}`, {
+          method: 'DELETE'
+        });
+        if (!res.ok) {
+          throw new Error(`Error al eliminar asistencia con ID ${idToDel}: ${res.statusText}`);
+        }
+      }
+      
+      // También limpiamos el estado de idsAEliminar acumulados de la interfaz
+      setIdsAEliminar([]);
+
+      // 4. Guardar/Actualizar los registros actuales
+      for (const payload of registrosAGuardar) {
+        const res = await fetch(`${API_BASE_URL}/api/asistencias`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Error al guardar asistencia para trabajador ${payload.idTrabajador}: ${text || res.statusText}`);
         }
       }
 
@@ -592,13 +601,13 @@ function App() {
   // ================= FUNCIONES GUARDAR ESTÁNDAR =================
   const guardarObra = (e) => { 
     e.preventDefault(); 
-    fetch('https://pg-backend-v364.onrender.com/api/obras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, nombreObra, fechaInicio }) })
+    fetch(`${API_BASE_URL}/api/obras`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, nombreObra, fechaInicio }) })
     .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); }); 
   };
   
   const toggleEstadoObra = async (id, estadoActual) => {
     try {
-      await fetch(`https://pg-backend-v364.onrender.com/api/obras/${id}/estado`, {
+      await fetch(`${API_BASE_URL}/api/obras/${id}/estado`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(!estadoActual)
@@ -621,7 +630,7 @@ function App() {
       pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0
     };
 
-    fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { 
+    fetch(`${API_BASE_URL}/api/trabajadores`, { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
       body: JSON.stringify(payload) 
@@ -640,7 +649,7 @@ function App() {
   const eliminarTrabajador = async (id) => {
     if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar a este trabajador?")) {
       try {
-        const response = await fetch(`https://pg-backend-v364.onrender.com/api/trabajadores/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/trabajadores/${id}`, {
           method: 'DELETE'
         });
         
@@ -657,13 +666,13 @@ function App() {
   
   const guardarAsistencia = (e) => { 
     e.preventDefault(); 
-    fetch('https://pg-backend-v364.onrender.com/api/asistencias', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fecha: fechaAsistencia, idTrabajador: parseInt(idTrabajadorSel), idObra: parseInt(idObraSelAsis), haAsistido: true, horasTrabajadas: parseFloat(horas) }) })
+    fetch(`${API_BASE_URL}/api/asistencias`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fecha: fechaAsistencia, idTrabajador: parseInt(idTrabajadorSel), idObra: parseInt(idObraSelAsis), haAsistido: true, horasTrabajadas: parseFloat(horas) }) })
     .then(() => { setFechaAsistencia(''); setIdTrabajadorSel(''); setIdObraSelAsis(''); setHoras(''); cargarAsistencias(); }); 
   };
   
   const guardarGasto = (e) => { 
     e.preventDefault(); 
-    fetch('https://pg-backend-v364.onrender.com/api/gastos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
+    fetch(`${API_BASE_URL}/api/gastos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
     .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 

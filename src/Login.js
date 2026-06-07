@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 
+
+// Dynamic API Base URL depending on environment
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8080'
+  : `${API_BASE_URL}`;
+
 // ================= LOGOTIPO GRUPO PG =================
 const LogoPG = () => (
   <svg height="60" viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', margin: '0 auto 10px auto' }}>
@@ -27,7 +33,7 @@ export default function Login({ onLoginSuccess }) {
     const cleanPass = password.trim();
 
     try {
-      const response = await fetch('https://pg-backend-v364.onrender.com/api/usuarios/login', {
+      const response = await fetch(`${API_BASE_URL}/api/usuarios/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: cleanUser, password: cleanPass })
