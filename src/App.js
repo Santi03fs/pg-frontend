@@ -225,11 +225,11 @@ function App() {
           esFinde: diaSemana === 0 || diaSemana === 6,
           fechaStr,
           idAsis: parteDb ? parteDb.id : null,
-          asistencia: parteDb ? 'Sí' : '',
+          asistencia: parteDb ? (parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No')) : '',
           horario: parteDb && parteDb.horario ? parteDb.horario : '',
           idObra: parteDb ? parteDb.idObra : '',
           horas: parteDb ? parteDb.horasTrabajadas : '',
-          partida: parteDb && parteDb.partida ? parteDb.partida : '', 
+          pagado: parteDb && parteDb.pagado ? 'Sí' : 'No', 
           descripcionExtra: parteDb && parteDb.descripcion ? parteDb.descripcion : '' 
         });
       }
@@ -241,14 +241,16 @@ function App() {
     const copia = [...cuadrante];
     copia[index][campo] = valor;
     
-    if ((campo === 'idObra' || campo === 'horas' || campo === 'horario' || campo === 'partida' || campo === 'descripcionExtra') && valor !== '') {
-      copia[index].asistencia = 'Sí';
+    if ((campo === 'idObra' || campo === 'horas' || campo === 'horario' || campo === 'pagado' || campo === 'descripcionExtra') && valor !== '') {
+      if (!copia[index].asistencia || copia[index].asistencia === '') {
+        copia[index].asistencia = 'Sí';
+      }
     }
     setCuadrante(copia);
   };
 
   const guardarCambiosCuadrante = async () => {
-    const editados = cuadrante.filter(d => d.asistencia === 'Sí' || d.horas !== '' || d.idObra !== '' || d.horario !== '' || d.partida !== '' || d.descripcionExtra !== '');
+    const editados = cuadrante.filter(d => d.asistencia === 'Sí' || d.asistencia === 'No' || d.asistencia === 'Vacaciones' || d.horas !== '' || d.idObra !== '' || d.horario !== '' || d.pagado !== 'No' || d.descripcionExtra !== '');
     
     for (const dia of editados) {
       const payload = {
@@ -256,11 +258,12 @@ function App() {
         fecha: dia.fechaStr, 
         idTrabajador: parseInt(trabajadorFiltro),
         idObra: parseInt(dia.idObra) || null, 
-        haAsistido: true, 
-        horasTrabajadas: parseFloat(dia.horas) || 0,
+        haAsistido: dia.asistencia === 'Sí', 
+        estadoAsistencia: dia.asistencia === 'Sí' ? 'Presente' : (dia.asistencia === 'Vacaciones' ? 'Vacaciones' : 'Ausente'),
+        horasTrabajadas: parseFloat(dia.horas) || 0.0,
         horario: dia.horario,
-        partida: dia.partida,
-        descripcion: dia.descripcionExtra
+        descripcion: dia.descripcionExtra,
+        pagado: dia.pagado === 'Sí'
       };
       
       await fetch(`${API_BASE_URL}/api/asistencias`, { 
@@ -890,7 +893,6 @@ function App() {
           <button onClick={() => setSeccionActiva('diario')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'diario' ? '#e67e22' : '#ecf0f1', color: seccionActiva === 'diario' ? 'white' : '#7f8c8d' }}>📅 Control Diario</button>
           <button onClick={() => setSeccionActiva('obras')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'obras' ? '#3498db' : '#ecf0f1', color: seccionActiva === 'obras' ? 'white' : '#7f8c8d' }}>Obras</button>
           <button onClick={() => setSeccionActiva('trabajadores')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'trabajadores' ? '#2ecc71' : '#ecf0f1', color: seccionActiva === 'trabajadores' ? 'white' : '#7f8c8d' }}>Personal</button>
-          <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
           <button onClick={() => setSeccionActiva('gastos')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'gastos' ? '#e74c3c' : '#ecf0f1', color: seccionActiva === 'gastos' ? 'white' : '#7f8c8d' }}>Gastos</button>
           <button onClick={() => setSeccionActiva('informes')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'informes' ? '#8e44ad' : '#ecf0f1', color: seccionActiva === 'informes' ? 'white' : '#7f8c8d' }}>🖨️ Partes</button>
           {usuarioActual?.rol === 'ADMIN' && (
@@ -1287,64 +1289,6 @@ function App() {
           </section>
         )}
 
-        {/* ================= 3. ASISTENCIAS ================= */}
-        {seccionActiva === 'asistencias' && (
-          <section className="no-print">
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
-              <h2 style={{ color: '#2c3e50', margin: 0 }}>🕒 Registro de Horas</h2>
-              
-              <div className="filtro-container">
-                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '14px' }}>Filtrar por Trabajador:</label>
-                <select 
-                  className="input-standard" 
-                  style={{ width: '300px', backgroundColor: '#fff9c4', borderColor: '#fbc02d', fontWeight: 'bold' }}
-                  value={filtroTrabajadorAsis} 
-                  onChange={e => setFiltroTrabajadorAsis(e.target.value)}
-                >
-                  <option value="">-- Todos los Trabajadores --</option>
-                  {trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {filtroTrabajadorAsis && (
-              <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', border: '1px solid #ffeeba', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Total horas de {getNombreTrabajador(parseInt(filtroTrabajadorAsis))}:</span>
-                <span style={{ fontSize: '20px' }}>{totalHorasFiltradas} h</span>
-              </div>
-            )}
-
-            <form onSubmit={guardarAsistencia} className="form-grid">
-              <input className="input-standard" type="date" value={fechaAsistencia} onChange={e=>setFechaAsistencia(e.target.value)} required />
-              <select className="input-standard" value={idTrabajadorSel} onChange={e=>setIdTrabajadorSel(e.target.value)} required><option value="">-- Trabajador --</option>{trabajadores.map(t=><option key={t.id} value={t.id}>{t.nombre}</option>)}</select>
-              <select className="input-standard" value={idObraSelAsis} onChange={e=>setIdObraSelAsis(e.target.value)} required><option value="">-- Obra --</option>{obras.map(o=><option key={o.id} value={o.id}>{o.nombreObra}</option>)}</select>
-              <div style={{display:'flex', gap:'10px', width: '100%'}}>
-                <input className="input-standard" style={{flex: 1}} type="number" step="0.5" placeholder="Horas" value={horas} onChange={e=>setHoras(e.target.value)} required />
-                <button type="submit" className="btn-action" style={{backgroundColor: '#f39c12', flex: 1}}>Registrar</button>
-              </div>
-            </form>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="tabla-general">
-                <thead><tr style={{background: '#f39c12'}}><th>Fecha</th><th>Trabajador</th><th>Obra</th><th>Horas</th></tr></thead>
-                <tbody>
-                  {asistenciasFiltradas.length === 0 ? (
-                    <tr><td colSpan="4" style={{textAlign:'center', color:'#95a5a6'}}>No hay horas registradas para esta selección.</td></tr>
-                  ) : (
-                    asistenciasFiltradas.map(a => (
-                      <tr key={a.id}>
-                        <td>{a.fecha}</td>
-                        <td><strong>{getNombreTrabajador(a.idTrabajador)}</strong></td>
-                        <td>{getNombreObra(a.idObra)}</td>
-                        <td style={{ fontWeight: 'bold' }}>{a.horasTrabajadas} h</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
 
         {/* ================= 4. GASTOS Y PRESUPUESTOS ================= */}
         {seccionActiva === 'gastos' && (
@@ -1445,12 +1389,12 @@ function App() {
                       <th style={{ border: '1px solid black', padding: '6px', width: '3%' }}>Día</th>
                       <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Mes</th>
                       <th style={{ border: '1px solid black', padding: '6px', width: '9%' }}>Día Sem.</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Asist.</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '10%' }}>Horario</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '10%' }}>Asist.</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '12%' }}>Horario</th>
                       <th style={{ border: '1px solid black', padding: '6px', width: '25%' }}>Obra</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Horas</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '12%' }}>Partida</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '25%' }}>Descripción</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Horas</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '8%' }}>Pagado</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '21%' }}>Descripción</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1464,7 +1408,17 @@ function App() {
                           <td style={{ border: '1px solid black' }}>{diaInfo.nSem}</td>
                           
                           <td style={{ border: '1px solid black' }}>
-                            <input className="input-paper" style={{textAlign: 'center'}} value={diaInfo.asistencia} onChange={e => handleEditCuadrante(index, 'asistencia', e.target.value)} />
+                            <select 
+                              className="input-paper" 
+                              style={{ textAlign: 'center', fontWeight: 'bold' }} 
+                              value={diaInfo.asistencia} 
+                              onChange={e => handleEditCuadrante(index, 'asistencia', e.target.value)}
+                            >
+                              <option value=""></option>
+                              <option value="Sí">Sí</option>
+                              <option value="No">No</option>
+                              <option value="Vacaciones">Vacaciones</option>
+                            </select>
                           </td>
                           <td style={{ border: '1px solid black' }}>
                             <input className="input-paper" style={{textAlign: 'center'}} placeholder="ej: 7 a 19:00" value={diaInfo.horario} onChange={e => handleEditCuadrante(index, 'horario', e.target.value)} />
@@ -1479,7 +1433,15 @@ function App() {
                             <input className="input-paper" style={{textAlign: 'center'}} type="number" step="0.5" value={diaInfo.horas} onChange={e => handleEditCuadrante(index, 'horas', e.target.value)} />
                           </td>
                           <td style={{ border: '1px solid black' }}>
-                            <input className="input-paper" value={diaInfo.partida} onChange={e => handleEditCuadrante(index, 'partida', e.target.value)} />
+                            <select 
+                              className="input-paper" 
+                              style={{ textAlign: 'center', fontWeight: 'bold' }} 
+                              value={diaInfo.pagado} 
+                              onChange={e => handleEditCuadrante(index, 'pagado', e.target.value)}
+                            >
+                              <option value="No">No</option>
+                              <option value="Sí">Sí</option>
+                            </select>
                           </td>
                           <td style={{ border: '1px solid black' }}>
                             <input className="input-paper" value={diaInfo.descripcionExtra} onChange={e => handleEditCuadrante(index, 'descripcionExtra', e.target.value)} />
