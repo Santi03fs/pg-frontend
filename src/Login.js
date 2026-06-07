@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 // Dynamic API Base URL depending on environment
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8080'
-  : `${API_BASE_URL}`;
+  : 'https://pg-backend-v364.onrender.com';
 
 // ================= LOGOTIPO GRUPO PG =================
 const LogoPG = () => (
