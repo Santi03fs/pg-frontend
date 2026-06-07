@@ -17,7 +17,7 @@ const LogoPG = () => (
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [usuarioActual, setUsuarioActual] = useState(null);
-  const [seccionActiva, setSeccionActiva] = useState('obras'); 
+  const [seccionActiva, setSeccionActiva] = useState('diario'); 
 
   // ================= ESTADOS GENERALES =================
   const [obras, setObras] = useState([]);
@@ -31,6 +31,17 @@ function App() {
   const [trabajadores, setTrabajadores] = useState([]);
   const [asistencias, setAsistencias] = useState([]);
   const [gastos, setGastos] = useState([]);
+
+  // Estados para Edición de Trabajador
+  const [idTrabajadorEdit, setIdTrabajadorEdit] = useState(null);
+  const [horasJornadaTrabajador, setHorasJornadaTrabajador] = useState('8.0');
+  const [pagoDiarioTrabajador, setPagoDiarioTrabajador] = useState('0.0');
+
+  // Estados para el Control Diario (Asistencia diaria rápida)
+  const [fechaControlDiario, setFechaControlDiario] = useState(new Date().toISOString().slice(0, 10));
+  const [filasDiario, setFilasDiario] = useState([]);
+  const [idsAEliminar, setIdsAEliminar] = useState([]);
+  const [guardando, setGuardando] = useState(false);
 
   // ================= ESTADOS FORMULARIOS =================
   const [cliente, setCliente] = useState('');
@@ -256,6 +267,328 @@ function App() {
     cargarAsistencias();
   };
 
+  // ================= LÓGICA DEL CONTROL DIARIO RÁPIDO =================
+  const cargarAsistenciaDiariaDelDia = () => {
+    if (!fechaControlDiario || trabajadores.length === 0) return;
+
+    // Filtrar las asistencias de este día específico
+    const asistenciasDia = asistencias.filter(a => a.fecha === fechaControlDiario);
+
+    // Mapear cada trabajador activo a su estado de ese día
+    const nuevasFilas = trabajadores.map(t => {
+      // Buscar todas las asistencias registradas para este trabajador hoy
+      const asistenciasT = asistenciasDia.filter(a => Number(a.idTrabajador) === Number(t.id));
+
+      const horasJornadaVal = t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0;
+      const pagoDiarioVal = t.pagoDiario !== undefined && t.pagoDiario !== null ? t.pagoDiario : 0.0;
+
+      if (asistenciasT.length === 0) {
+        // No hay registros
+        return {
+          idTrabajador: t.id,
+          nombre: t.nombre,
+          horasJornada: horasJornadaVal,
+          pagoDiarioDefault: pagoDiarioVal,
+          estadoAsistencia: 'Ausente',
+          idAsistenciaRaiz: null,
+          obras: [
+            {
+              idAsistencia: null,
+              idObra: '',
+              partida: '',
+              descripcion: '',
+              tipoPago: 'Normal',
+              pagoDia: pagoDiarioVal,
+              horasTrabajadas: ''
+            }
+          ]
+        };
+      } else {
+        // Hay registros en BD
+        // Comprobar si hay un registro raíz (ausencia)
+        const registroRaiz = asistenciasT.find(a => a.idObra === null || !a.haAsistido);
+        if (registroRaiz) {
+          return {
+            idTrabajador: t.id,
+            nombre: t.nombre,
+            horasJornada: horasJornadaVal,
+            pagoDiarioDefault: pagoDiarioVal,
+            estadoAsistencia: registroRaiz.estadoAsistencia || 'Ausente',
+            idAsistenciaRaiz: registroRaiz.id,
+            obras: [
+              {
+                idAsistencia: null,
+                idObra: '',
+                partida: '',
+                descripcion: '',
+                tipoPago: 'Normal',
+                pagoDia: pagoDiarioVal,
+                horasTrabajadas: ''
+              }
+            ]
+          };
+        } else {
+          // Presente con obras
+          return {
+            idTrabajador: t.id,
+            nombre: t.nombre,
+            horasJornada: horasJornadaVal,
+            pagoDiarioDefault: pagoDiarioVal,
+            estadoAsistencia: 'Presente',
+            idAsistenciaRaiz: null,
+            obras: asistenciasT.map(a => ({
+              idAsistencia: a.id,
+              idObra: a.idObra || '',
+              partida: a.partida || '',
+              descripcion: a.descripcion || '',
+              tipoPago: a.tipoPago || 'Normal',
+              pagoDia: a.pagoDia !== undefined && a.pagoDia !== null ? a.pagoDia : (t.pagoDiario || 0.0),
+              horasTrabajadas: a.horasTrabajadas !== undefined ? a.horasTrabajadas : ''
+            }))
+          };
+        }
+      }
+    });
+
+    setFilasDiario(nuevasFilas);
+  };
+
+  useEffect(() => {
+    cargarAsistenciaDiariaDelDia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaControlDiario, trabajadores, asistencias]);
+
+  const handleCambiarEstadoAsistencia = (trabajadorId, nuevoEstado) => {
+    setFilasDiario(prev => prev.map(f => {
+      if (f.idTrabajador === trabajadorId) {
+        return {
+          ...f,
+          estadoAsistencia: nuevoEstado,
+          obras: nuevoEstado === 'Presente' && (f.obras.length === 0 || (f.obras.length === 1 && f.obras[0].idObra === '')) ? [
+            { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '' }
+          ] : f.obras
+        };
+      }
+      return f;
+    }));
+  };
+
+  const handleAddObraAsignacion = (trabajadorId) => {
+    setFilasDiario(prev => prev.map(f => {
+      if (f.idTrabajador === trabajadorId) {
+        return {
+          ...f,
+          obras: [
+            ...f.obras,
+            { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '' }
+          ]
+        };
+      }
+      return f;
+    }));
+  };
+
+  const handleRemoveObraAsignacion = (trabajadorId, obraIndex, idAsistencia) => {
+    if (idAsistencia) {
+      setIdsAEliminar(prev => [...prev, idAsistencia]);
+    }
+    
+    setFilasDiario(prev => prev.map(f => {
+      if (f.idTrabajador === trabajadorId) {
+        const nuevasObras = f.obras.filter((_, idx) => idx !== obraIndex);
+        return {
+          ...f,
+          obras: nuevasObras.length === 0 ? [
+            { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '' }
+          ] : nuevasObras
+        };
+      }
+      return f;
+    }));
+  };
+
+  const handleModificarObraAsignacion = (trabajadorId, obraIndex, campo, valor) => {
+    setFilasDiario(prev => prev.map(f => {
+      if (f.idTrabajador === trabajadorId) {
+        const nuevasObras = f.obras.map((o, idx) => {
+          if (idx === obraIndex) {
+            const obraModificada = { ...o, [campo]: valor };
+            if (campo === 'tipoPago' && valor === 'Normal') {
+              obraModificada.pagoDia = f.pagoDiarioDefault;
+            }
+            return obraModificada;
+          }
+          return o;
+        });
+        return { ...f, obras: nuevasObras };
+      }
+      return f;
+    }));
+  };
+
+  const guardarControlDiario = async () => {
+    // Validaciones
+    for (const fila of filasDiario) {
+      if (fila.estadoAsistencia === 'Presente') {
+        if (fila.obras.length === 0) {
+          alert(`Falta asignar al menos una obra para ${fila.nombre} ya que está marcado como Presente.`);
+          return;
+        }
+        for (let i = 0; i < fila.obras.length; i++) {
+          const o = fila.obras[i];
+          if (!o.idObra) {
+            alert(`Falta seleccionar la Obra en la asignación ${i + 1} de ${fila.nombre}.`);
+            return;
+          }
+          if (!o.partida) {
+            alert(`Falta seleccionar la Partida en la asignación ${i + 1} de ${fila.nombre}.`);
+            return;
+          }
+          if (o.horasTrabajadas === '' || isNaN(parseFloat(o.horasTrabajadas))) {
+            alert(`Falta especificar las Horas en la asignación ${i + 1} de ${fila.nombre}.`);
+            return;
+          }
+          if (o.tipoPago === 'Personalizado' && (o.pagoDia === '' || isNaN(parseFloat(o.pagoDia)))) {
+            alert(`Falta especificar el Pago Personalizado en la asignación ${i + 1} de ${fila.nombre}.`);
+            return;
+          }
+        }
+      }
+    }
+
+    setGuardando(true);
+
+    try {
+      // 1. Borrar IDs
+      for (const idToDel of idsAEliminar) {
+        await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${idToDel}`, {
+          method: 'DELETE'
+        });
+      }
+      setIdsAEliminar([]);
+
+      // 2. Guardar registros actuales
+      for (const fila of filasDiario) {
+        if (fila.estadoAsistencia === 'Presente') {
+          // Guardar cada obra
+          for (const o of fila.obras) {
+            const payload = {
+              id: o.idAsistencia || null,
+              fecha: fechaControlDiario,
+              idTrabajador: fila.idTrabajador,
+              idObra: parseInt(o.idObra),
+              haAsistido: true,
+              estadoAsistencia: 'Presente',
+              horasTrabajadas: parseFloat(o.horasTrabajadas),
+              horario: "",
+              partida: o.partida,
+              descripcion: o.descripcion || "",
+              tipoPago: o.tipoPago,
+              pagoDia: parseFloat(o.pagoDia) || 0.0
+            };
+
+            await fetch('https://pg-backend-v364.onrender.com/api/asistencias', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          }
+
+          // Si antes tenía un registro raíz (ausencia) y ahora pasó a Presente, borrar el registro raíz
+          if (fila.idAsistenciaRaiz) {
+            await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${fila.idAsistenciaRaiz}`, {
+              method: 'DELETE'
+            });
+          }
+
+        } else {
+          // Ausente, Vacaciones, Baja
+          const payload = {
+            id: fila.idAsistenciaRaiz || null,
+            fecha: fechaControlDiario,
+            idTrabajador: fila.idTrabajador,
+            idObra: null,
+            haAsistido: false,
+            estadoAsistencia: fila.estadoAsistencia,
+            horasTrabajadas: 0.0,
+            horario: "",
+            partida: "",
+            descripcion: "",
+            tipoPago: "Normal",
+            pagoDia: 0.0
+          };
+
+          await fetch('https://pg-backend-v364.onrender.com/api/asistencias', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          // Si antes tenía obras (Presente) y ahora es Ausente/Vacaciones/Baja, borrar obras asociadas
+          const obrasPreviasConId = fila.obras.filter(o => o.idAsistencia !== null);
+          for (const op of obrasPreviasConId) {
+            await fetch(`https://pg-backend-v364.onrender.com/api/asistencias/${op.idAsistencia}`, {
+              method: 'DELETE'
+            });
+          }
+        }
+      }
+
+      alert("¡Asistencia diaria guardada con éxito!");
+      cargarAsistencias();
+    } catch (error) {
+      console.error("Error al guardar asistencia diaria:", error);
+      alert("Error al guardar los datos de asistencia diaria.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const iniciarEdicionTrabajador = (t) => {
+    setIdTrabajadorEdit(t.id);
+    setNombreTrabajador(t.nombre);
+    setDni(t.dni || '');
+    setTelefono(t.telefono || '');
+    setHorasJornadaTrabajador(t.horasJornada !== undefined && t.horasJornada !== null ? String(t.horasJornada) : '8.0');
+    setPagoDiarioTrabajador(t.pagoDiario !== undefined && t.pagoDiario !== null ? String(t.pagoDiario) : '0.0');
+  };
+
+  const cancelarEdicionTrabajador = () => {
+    setIdTrabajadorEdit(null);
+    setNombreTrabajador('');
+    setDni('');
+    setTelefono('');
+    setHorasJornadaTrabajador('8.0');
+    setPagoDiarioTrabajador('0.0');
+  };
+
+  const obtenerAusentes = () => {
+    return filasDiario.filter(f => f.estadoAsistencia !== 'Presente');
+  };
+
+  const obtenerAvisosJornadaIncompleta = () => {
+    const avisos = [];
+    filasDiario.forEach(f => {
+      if (f.estadoAsistencia === 'Presente') {
+        const totalHorasDia = f.obras.reduce((acc, o) => {
+          const hrs = parseFloat(o.horasTrabajadas);
+          return acc + (isNaN(hrs) ? 0 : hrs);
+        }, 0);
+
+        if (totalHorasDia < f.horasJornada) {
+          const faltan = (f.horasJornada - totalHorasDia).toFixed(1);
+          avisos.push({
+            nombre: f.nombre,
+            horasJornada: f.horasJornada,
+            totalHorasDia,
+            faltan
+          });
+        }
+      }
+    });
+    return avisos;
+  };
+
   // ================= FUNCIONES GUARDAR ESTÁNDAR =================
   const guardarObra = (e) => { 
     e.preventDefault(); 
@@ -278,8 +611,30 @@ function App() {
 
   const guardarTrabajador = (e) => { 
     e.preventDefault(); 
-    fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombreTrabajador, dni, telefono, estado: 'Activo' }) })
-    .then(() => { setNombreTrabajador(''); setDni(''); setTelefono(''); cargarTrabajadores(); }); 
+    const payload = {
+      id: idTrabajadorEdit,
+      nombre: nombreTrabajador,
+      dni,
+      telefono,
+      estado: 'Activo',
+      horasJornada: parseFloat(horasJornadaTrabajador) || 8.0,
+      pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0
+    };
+
+    fetch('https://pg-backend-v364.onrender.com/api/trabajadores', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify(payload) 
+    })
+    .then(() => { 
+      setNombreTrabajador(''); 
+      setDni(''); 
+      setTelefono(''); 
+      setHorasJornadaTrabajador('8.0');
+      setPagoDiarioTrabajador('0.0');
+      setIdTrabajadorEdit(null);
+      cargarTrabajadores(); 
+    }); 
   };
 
   const eliminarTrabajador = async (id) => {
@@ -460,6 +815,7 @@ function App() {
         .btn-nav { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: 0.2s; font-size: 13px; text-align: center; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #eee; }
+        .form-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #eee; }
         .btn-action { padding: 12px; cursor: pointer; border: none; border-radius: 6px; color: white; font-weight: bold; font-size: 14px; }
         .tabla-general { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
         .tabla-general th { padding: 12px; color: white; }
@@ -488,6 +844,7 @@ function App() {
         
         @media (max-width: 1024px) {
           .form-grid { grid-template-columns: repeat(2, 1fr); } 
+          .form-grid-5 { grid-template-columns: repeat(2, 1fr); } 
           .btn-action.full-width-mobile { grid-column: span 2; }
         }
 
@@ -499,6 +856,7 @@ function App() {
           .btn-nav { flex: 1 1 calc(33% - 10px); font-size: 12px; } 
           
           .form-grid { grid-template-columns: 1fr; } 
+          .form-grid-5 { grid-template-columns: 1fr; } 
           .btn-action.full-width-mobile { grid-column: span 1; }
           
           .tarjetas-resultados { grid-template-columns: 1fr; gap: 10px; } 
@@ -520,6 +878,7 @@ function App() {
           </div>
         </div>
         <div className="nav-buttons">
+          <button onClick={() => setSeccionActiva('diario')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'diario' ? '#e67e22' : '#ecf0f1', color: seccionActiva === 'diario' ? 'white' : '#7f8c8d' }}>📅 Control Diario</button>
           <button onClick={() => setSeccionActiva('obras')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'obras' ? '#3498db' : '#ecf0f1', color: seccionActiva === 'obras' ? 'white' : '#7f8c8d' }}>Obras</button>
           <button onClick={() => setSeccionActiva('trabajadores')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'trabajadores' ? '#2ecc71' : '#ecf0f1', color: seccionActiva === 'trabajadores' ? 'white' : '#7f8c8d' }}>Personal</button>
           <button onClick={() => setSeccionActiva('asistencias')} className="btn-nav" style={{ backgroundColor: seccionActiva === 'asistencias' ? '#f39c12' : '#ecf0f1', color: seccionActiva === 'asistencias' ? 'white' : '#7f8c8d' }}>Horas</button>
@@ -534,6 +893,288 @@ function App() {
 
       <div className="card print-container">
         
+        {/* ================= 0. CONTROL DIARIO RÁPIDO ================= */}
+        {seccionActiva === 'diario' && (
+          <section className="no-print">
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '15px', marginBottom: '20px' }}>
+              <h2 style={{ color: '#2c3e50', margin: 0 }}>📅 Asistencia y Asignación Diaria</h2>
+              <div className="filtro-container" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontWeight: 'bold', color: '#7f8c8d', fontSize: '15px' }}>Fecha de Trabajo:</label>
+                <input 
+                  className="input-standard" 
+                  type="date" 
+                  style={{ width: '180px', fontSize: '16px', fontWeight: 'bold', border: '2px solid #e67e22', borderRadius: '8px' }}
+                  value={fechaControlDiario} 
+                  onChange={e => setFechaControlDiario(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            {/* SECCIÓN DE RESUMEN DE AUSENCIAS Y ALERTAS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+              {/* Resumen de Ausencias */}
+              <div style={{ backgroundColor: '#fdf2e9', border: '1px solid #f5cba7', borderRadius: '8px', padding: '15px' }}>
+                <h3 style={{ margin: '0 0 10px 0', color: '#d35400', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🚫 Resumen de Ausencias hoy
+                </h3>
+                {obtenerAusentes().length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '14px', color: '#7f8c8d', fontStyle: 'italic' }}>Todo el personal está presente hoy.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {obtenerAusentes().map(f => {
+                      let bgColor = '#e74c3c';
+                      if (f.estadoAsistencia === 'Vacaciones') bgColor = '#3498db';
+                      if (f.estadoAsistencia === 'Baja') bgColor = '#f39c12';
+                      return (
+                        <span key={f.idTrabajador} style={{ backgroundColor: bgColor, color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
+                          {f.nombre} ({f.estadoAsistencia})
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Alertas de jornada incompleta */}
+              <div style={{ backgroundColor: '#fcf3cf', border: '1px solid #f9e79f', borderRadius: '8px', padding: '15px' }}>
+                <h3 style={{ margin: '0 0 10px 0', color: '#b7950b', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ Avisos de Jornada Incompleta
+                </h3>
+                {obtenerAvisosJornadaIncompleta().length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '14px', color: '#7f8c8d', fontStyle: 'italic' }}>Todos los trabajadores presentes cumplen su jornada laboral.</p>
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#7d6608' }}>
+                    {obtenerAvisosJornadaIncompleta().map((aviso, idx) => (
+                      <li key={idx} style={{ marginBottom: '4px' }}>
+                        A <strong>{aviso.nombre}</strong> le faltan <strong>{aviso.faltan} h</strong> para acabar su jornada laboral ({aviso.totalHorasDia}h registradas de {aviso.horasJornada}h).
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* TABLA PRINCIPAL DE EMPLEADOS */}
+            <div style={{ overflowX: 'auto', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', marginBottom: '20px' }}>
+              <table className="tabla-general" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#e67e22', color: 'white' }}>
+                    <th style={{ width: '20%', padding: '12px' }}>Empleado</th>
+                    <th style={{ width: '15%', padding: '12px' }}>Asistencia</th>
+                    <th style={{ width: '65%', padding: '12px' }}>Asignación de Obra, Partida, Detalles y Horas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filasDiario.map((fila) => (
+                    <tr key={fila.idTrabajador} style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: fila.estadoAsistencia !== 'Presente' ? '#f9f9f9' : 'white' }}>
+                      
+                      {/* EMPLEADO INFO */}
+                      <td style={{ padding: '15px', verticalAlign: 'top' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#2c3e50' }}>{fila.nombre}</div>
+                        <div style={{ display: 'flex', gap: '5px', marginTop: '5px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '11px', background: '#ebf5fb', color: '#2980b9', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                            Jornada: {fila.horasJornada}h
+                          </span>
+                          <span style={{ fontSize: '11px', background: '#efebe9', color: '#5d4037', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                            Tarifa: {fila.pagoDiarioDefault}€
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* ESTADO ASISTENCIA */}
+                      <td style={{ padding: '15px', verticalAlign: 'top' }}>
+                        <select 
+                          className="input-standard" 
+                          style={{ 
+                            fontWeight: 'bold', 
+                            color: 'white',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            backgroundColor: 
+                              fila.estadoAsistencia === 'Presente' ? '#2ecc71' : 
+                              fila.estadoAsistencia === 'Vacaciones' ? '#3498db' : 
+                              fila.estadoAsistencia === 'Baja' ? '#f39c12' : '#e74c3c'
+                          }}
+                          value={fila.estadoAsistencia}
+                          onChange={(e) => handleCambiarEstadoAsistencia(fila.idTrabajador, e.target.value)}
+                        >
+                          <option value="Presente" style={{backgroundColor: '#2ecc71', color: 'white'}}>Presente</option>
+                          <option value="Vacaciones" style={{backgroundColor: '#3498db', color: 'white'}}>Vacaciones</option>
+                          <option value="Ausente" style={{backgroundColor: '#e74c3c', color: 'white'}}>Ausente</option>
+                          <option value="Baja" style={{backgroundColor: '#f39c12', color: 'white'}}>Baja</option>
+                        </select>
+                      </td>
+
+                      {/* ASIGNACIÓN DE OBRAS */}
+                      <td style={{ padding: '15px', verticalAlign: 'top' }}>
+                        {fila.estadoAsistencia !== 'Presente' ? (
+                          <div style={{ padding: '10px', color: '#95a5a6', fontStyle: 'italic', fontSize: '14px' }}>
+                            Sin asignaciones de obra por {fila.estadoAsistencia.toLowerCase()}.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {fila.obras.map((obraAsig, idx) => (
+                              <div 
+                                key={idx} 
+                                style={{ 
+                                  display: 'grid', 
+                                  gridTemplateColumns: 'minmax(160px, 1fr) auto minmax(130px, 1fr) minmax(150px, 1.2fr) auto minmax(80px, auto) minmax(70px, 80px) auto', 
+                                  gap: '10px', 
+                                  alignItems: 'center',
+                                  background: '#f8f9fa',
+                                  padding: '10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #eaeded'
+                                }}
+                              >
+                                {/* Obra */}
+                                <select 
+                                  className="input-standard" 
+                                  style={{ padding: '6px', fontSize: '13px' }}
+                                  value={obraAsig.idObra}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'idObra', e.target.value)}
+                                >
+                                  <option value="">-- Seleccionar Obra --</option>
+                                  {obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra} ({o.cliente})</option>)}
+                                </select>
+
+                                {/* Botón Más obras */}
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleAddObraAsignacion(fila.idTrabajador)}
+                                  style={{ background: '#e67e22', color: 'white', border: 'none', borderRadius: '4px', width: '28px', height: '28px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Añadir otra obra"
+                                >
+                                  +
+                                </button>
+
+                                {/* Partida */}
+                                <select 
+                                  className="input-standard" 
+                                  style={{ padding: '6px', fontSize: '13px' }}
+                                  value={obraAsig.partida}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'partida', e.target.value)}
+                                >
+                                  <option value="">-- Partida --</option>
+                                  <option value="Cimentación">Cimentación</option>
+                                  <option value="Estructura">Estructura</option>
+                                  <option value="Albañilería">Albañilería</option>
+                                  <option value="Yeso y Pladur">Yeso y Pladur</option>
+                                  <option value="Electricidad">Electricidad</option>
+                                  <option value="Fontanería">Fontanería</option>
+                                  <option value="Pintura">Pintura</option>
+                                  <option value="Alicatados">Alicatados</option>
+                                  <option value="Carpintería">Carpintería</option>
+                                  <option value="Cerrajería">Cerrajería</option>
+                                  <option value="Limpieza">Limpieza</option>
+                                  <option value="Varios">Varios</option>
+                                </select>
+
+                                {/* Descripción */}
+                                <input 
+                                  className="input-standard"
+                                  placeholder="Pequeña descripción..."
+                                  style={{ padding: '6px', fontSize: '13px' }}
+                                  value={obraAsig.descripcion}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value)}
+                                />
+
+                                {/* Tipo Pago Neto */}
+                                <select 
+                                  className="input-standard" 
+                                  style={{ padding: '6px', fontSize: '13px', width: '110px' }}
+                                  value={obraAsig.tipoPago}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'tipoPago', e.target.value)}
+                                >
+                                  <option value="Normal">Normal</option>
+                                  <option value="Personalizado">Personalizado</option>
+                                </select>
+
+                                {/* Valor Pago Neto */}
+                                <input 
+                                  type="number"
+                                  className="input-standard"
+                                  style={{ padding: '6px', fontSize: '13px', width: '70px', textAlign: 'right' }}
+                                  value={obraAsig.pagoDia}
+                                  disabled={obraAsig.tipoPago === 'Normal'}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'pagoDia', e.target.value)}
+                                />
+
+                                {/* Horas */}
+                                <input 
+                                  type="number"
+                                  step="0.5"
+                                  className="input-standard"
+                                  placeholder="Horas"
+                                  style={{ padding: '6px', fontSize: '13px', width: '60px', textAlign: 'center', fontWeight: 'bold' }}
+                                  value={obraAsig.horasTrabajadas}
+                                  onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'horasTrabajadas', e.target.value)}
+                                />
+
+                                {/* Quitar Obra */}
+                                <button 
+                                  type="button"
+                                  disabled={fila.obras.length === 1}
+                                  onClick={() => handleRemoveObraAsignacion(fila.idTrabajador, idx, obraAsig.idAsistencia)}
+                                  style={{ 
+                                    background: '#e74c3c', 
+                                    color: 'white', 
+                                    border: 'none', 
+                                    borderRadius: '4px', 
+                                    width: '28px', 
+                                    height: '28px', 
+                                    cursor: fila.obras.length === 1 ? 'not-allowed' : 'pointer', 
+                                    opacity: fila.obras.length === 1 ? 0.3 : 1, 
+                                    fontWeight: 'bold', 
+                                    fontSize: '14px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center' 
+                                  }}
+                                  title="Eliminar asignación"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* BOTÓN GUARDAR */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button 
+                type="button" 
+                onClick={guardarControlDiario} 
+                className="btn-action"
+                style={{ backgroundColor: '#e67e22', padding: '12px 30px', fontSize: '16px', minWidth: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                disabled={guardando}
+              >
+                {guardando ? (
+                  <>
+                    <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }}></span>
+                    Guardando...
+                  </>
+                ) : (
+                  '💾 Guardar Asistencias'
+                )}
+              </button>
+            </div>
+            
+            <style>{`
+              @keyframes spin {
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
+          </section>
+        )}
+
         {/* ================= 1. OBRAS ================= */}
         {seccionActiva === 'obras' && (
           <section className="no-print">
@@ -583,18 +1224,32 @@ function App() {
         {/* ================= 2. TRABAJADORES ================= */}
         {seccionActiva === 'trabajadores' && (
           <section className="no-print">
-            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>👷 Plantilla de Personal</h2>
-            <form onSubmit={guardarTrabajador} className="form-grid">
+            <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '20px' }}>
+              {idTrabajadorEdit ? `✏️ Editar Trabajador: ${nombreTrabajador}` : '👷 Plantilla de Personal'}
+            </h2>
+            <form onSubmit={guardarTrabajador} className="form-grid-5">
               <input className="input-standard" placeholder="Nombre Completo" value={nombreTrabajador} onChange={e=>setNombreTrabajador(e.target.value)} required />
               <input className="input-standard" placeholder="DNI" value={dni} onChange={e=>setDni(e.target.value)} />
               <input className="input-standard" placeholder="Teléfono" value={telefono} onChange={e=>setTelefono(e.target.value)} />
-              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#2ecc71'}}>Añadir Trabajador</button>
+              <input type="number" step="0.5" className="input-standard" placeholder="Horas Jornada (Ej: 8.0)" value={horasJornadaTrabajador} onChange={e=>setHorasJornadaTrabajador(e.target.value)} required />
+              <input type="number" step="1" className="input-standard" placeholder="Pago Diario (€) (Ej: 120)" value={pagoDiarioTrabajador} onChange={e=>setPagoDiarioTrabajador(e.target.value)} required />
+              
+              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" className="btn-action" style={{ backgroundColor: idTrabajadorEdit ? '#3498db' : '#2ecc71', flex: 2 }}>
+                  {idTrabajadorEdit ? '💾 Guardar Cambios' : '➕ Añadir Trabajador'}
+                </button>
+                {idTrabajadorEdit && (
+                  <button type="button" onClick={cancelarEdicionTrabajador} className="btn-action" style={{ backgroundColor: '#95a5a6', flex: 1 }}>
+                    ❌ Cancelar Edición
+                  </button>
+                )}
+              </div>
             </form>
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
                 <thead>
                   <tr style={{background: '#2ecc71'}}>
-                    <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Acciones</th>
+                    <th>ID</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Jornada (h)</th><th>Pago Diario</th><th>Estado</th><th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -602,10 +1257,15 @@ function App() {
                     <tr key={t.id}>
                       <td>{t.id}</td>
                       <td><strong>{t.nombre}</strong></td>
-                      <td>{t.dni}</td>
-                      <td>{t.telefono}</td>
+                      <td>{t.dni || '-'}</td>
+                      <td>{t.telefono || '-'}</td>
+                      <td style={{ fontWeight: 'bold' }}>{t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0} h</td>
+                      <td style={{ fontWeight: 'bold', color: '#27ae60' }}>{t.pagoDiario !== undefined && t.pagoDiario !== null ? t.pagoDiario : 0} €</td>
                       <td>{t.estado}</td>
-                      <td>
+                      <td style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => iniciarEdicionTrabajador(t)} className="btn-excel" style={{ backgroundColor: '#3498db' }}>
+                          ✏️ Editar
+                        </button>
                         <button onClick={() => eliminarTrabajador(t.id)} className="btn-delete">
                           🗑️ Borrar
                         </button>
