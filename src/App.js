@@ -5,7 +5,6 @@ import Login from './Login';
 
 
 
-// Dynamic API Base URL depending on environment
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8080'
   : 'https://pg-backend-v364.onrender.com';
@@ -237,9 +236,12 @@ function App() {
             asistencia: '',
             horario: '',
             idObra: '',
+            partida: '',
             horas: '',
             pagado: 'No', 
-            descripcionExtra: '' 
+            descripcionExtra: '',
+            tipoPago: 'Normal',
+            pagoDia: 0.0
           });
         } else {
           partesDb.forEach(parteDb => {
@@ -253,9 +255,12 @@ function App() {
               asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No'),
               horario: parteDb.horario || '',
               idObra: parteDb.idObra || '',
+              partida: parteDb.partida || '',
               horas: parteDb.horasTrabajadas !== undefined ? parteDb.horasTrabajadas : '',
               pagado: parteDb.pagado ? 'Sí' : 'No', 
-              descripcionExtra: parteDb.descripcion || '' 
+              descripcionExtra: parteDb.descripcion || '',
+              tipoPago: parteDb.tipoPago || 'Normal',
+              pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0
             });
           });
         }
@@ -276,9 +281,12 @@ function App() {
       asistencia: 'Sí',
       horario: '',
       idObra: '',
+      partida: '',
       horas: '',
       pagado: 'No',
       descripcionExtra: '',
+      tipoPago: 'Normal',
+      pagoDia: targetDay.pagoDia || 0.0,
       isNewRow: true
     };
     const copia = [...cuadrante];
@@ -321,30 +329,44 @@ function App() {
   };
 
   const guardarCambiosCuadrante = async () => {
-    const editados = cuadrante.filter(d => d.asistencia === 'Sí' || d.asistencia === 'No' || d.asistencia === 'Vacaciones' || d.horas !== '' || d.idObra !== '' || d.horario !== '' || d.pagado !== 'No' || d.descripcionExtra !== '');
+    const editados = cuadrante.filter(d => d.asistencia === 'Sí' || d.asistencia === 'No' || d.asistencia === 'Vacaciones' || d.horas !== '' || d.idObra !== '' || d.partida !== '' || d.horario !== '' || d.pagado !== 'No' || d.descripcionExtra !== '');
     
-    for (const dia of editados) {
-      const payload = {
-        id: dia.idAsis, 
-        fecha: dia.fechaStr, 
-        idTrabajador: parseInt(trabajadorFiltro),
-        idObra: parseInt(dia.idObra) || null, 
-        haAsistido: dia.asistencia === 'Sí', 
-        estadoAsistencia: dia.asistencia === 'Sí' ? 'Presente' : (dia.asistencia === 'Vacaciones' ? 'Vacaciones' : 'Ausente'),
-        horasTrabajadas: parseFloat(dia.horas) || 0.0,
-        horario: dia.horario,
-        descripcion: dia.descripcionExtra,
-        pagado: dia.pagado === 'Sí'
-      };
-      
-      await fetch(`${API_BASE_URL}/api/asistencias`, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-      });
+    const lotes = editados.map(dia => ({
+      id: dia.idAsis, 
+      fecha: dia.fechaStr, 
+      idTrabajador: parseInt(trabajadorFiltro),
+      idObra: parseInt(dia.idObra) || null, 
+      haAsistido: dia.asistencia === 'Sí', 
+      estadoAsistencia: dia.asistencia === 'Sí' ? 'Presente' : (dia.asistencia === 'Vacaciones' ? 'Vacaciones' : 'Ausente'),
+      horasTrabajadas: parseFloat(dia.horas) || 0.0,
+      horario: dia.horario,
+      partida: dia.partida || "",
+      descripcion: dia.descripcionExtra || "",
+      tipoPago: dia.tipoPago || "Normal",
+      pagoDia: parseFloat(dia.pagoDia) || 0.0,
+      pagado: dia.pagado === 'Sí'
+    }));
+
+    if (lotes.length > 0) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/asistencias/batch`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify(lotes) 
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
+        alert("¡Cuadrante guardado en la base de datos con éxito!"); 
+        cargarAsistencias();
+      } catch (error) {
+        console.error("Error al guardar cuadrante en lote:", error);
+        alert("Error al guardar los datos del cuadrante.");
+      }
+    } else {
+      alert("No hay cambios que guardar.");
     }
-    alert("¡Cuadrante guardado en la base de datos con éxito!"); 
-    cargarAsistencias();
   };
 
   // ================= LÓGICA DEL CONTROL DIARIO RÁPIDO =================
@@ -604,16 +626,16 @@ function App() {
       // También limpiamos el estado de idsAEliminar acumulados de la interfaz
       setIdsAEliminar([]);
 
-      // 4. Guardar/Actualizar los registros actuales
-      for (const payload of registrosAGuardar) {
-        const res = await fetch(`${API_BASE_URL}/api/asistencias`, {
+      // 4. Guardar/Actualizar los registros actuales en lote (batch)
+      if (registrosAGuardar.length > 0) {
+        const res = await fetch(`${API_BASE_URL}/api/asistencias/batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(registrosAGuardar)
         });
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`Error al guardar asistencia para trabajador ${payload.idTrabajador}: ${text || res.statusText}`);
+          throw new Error(`Error al guardar asistencias en lote: ${text || res.statusText}`);
         }
       }
 
@@ -1549,14 +1571,15 @@ function App() {
                   <thead>
                     <tr style={{ background: '#f0f0f0' }}>
                       <th style={{ border: '1px solid black', padding: '6px', width: '3%' }}>Día</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Mes</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '9%' }}>Día Sem.</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '10%' }}>Asist.</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '12%' }}>Horario</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '25%' }}>Obra</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Horas</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '8%' }}>Pagado</th>
-                      <th style={{ border: '1px solid black', padding: '6px', width: '21%' }}>Descripción</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Mes</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '7%' }}>Día Sem.</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '8%' }}>Asist.</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '10%' }}>Horario</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '20%' }}>Obra</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '15%' }}>Partida</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Horas</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Pagado</th>
+                      <th style={{ border: '1px solid black', padding: '6px', width: '16%' }}>Descripción</th>
                       <th className="no-print" style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Acciones</th>
                     </tr>
                   </thead>
@@ -1590,6 +1613,21 @@ function App() {
                             <select className="input-paper" value={diaInfo.idObra} onChange={e => handleEditCuadrante(index, 'idObra', e.target.value)}>
                               <option value=""></option>
                               {obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ border: '1px solid black', textAlign: 'left' }}>
+                            <select 
+                              className="input-paper" 
+                              value={diaInfo.partida} 
+                              onChange={e => handleEditCuadrante(index, 'partida', e.target.value)}
+                            >
+                              <option value="">-- Partida --</option>
+                              {partidas
+                                .filter(p => Number(p.idObra) === Number(diaInfo.idObra))
+                                .map(p => (
+                                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                                ))
+                              }
                             </select>
                           </td>
                           <td style={{ border: '1px solid black' }}>
