@@ -36,3 +36,54 @@
     transform: rotate(360deg);
   }
 }
+
+/* Acciones en la pantalla de partes */
+.btn-partes-accion-add {
+  background-color: #27ae60 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(46, 204, 113, 0.3) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+.btn-partes-accion-add:hover {
+  background-color: #2ecc71 !important;
+  transform: scale(1.18) !important;
+  box-shadow: 0 4px 8px rgba(46, 204, 113, 0.5) !important;
+}
+.btn-partes-accion-add:active {
+  transform: scale(0.9) !important;
+}
+
+.btn-partes-accion-del {
+  background-color: #c0392b !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(231, 76, 60, 0.3) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+.btn-partes-accion-del:hover {
+  background-color: #e74c3c !important;
+  transform: scale(1.18) !important;
+  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.5) !important;
+}
+.btn-partes-accion-del:active {
+  transform: scale(0.9) !important;
+}

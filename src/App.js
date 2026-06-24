@@ -1648,11 +1648,11 @@ function App() {
                             <input className="input-paper" value={diaInfo.descripcionExtra} onChange={e => handleEditCuadrante(index, 'descripcionExtra', e.target.value)} />
                           </td>
                           <td className="no-print" style={{ border: '1px solid black' }}>
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
                               <button 
                                 type="button" 
                                 onClick={() => handleAddRowCuadrante(index)} 
-                                style={{ background: '#e67e22', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                className="btn-partes-accion-add"
                                 title="Añadir obra a este día"
                               >
                                 +
@@ -1661,10 +1661,10 @@ function App() {
                                 <button 
                                   type="button" 
                                   onClick={() => handleRemoveRowCuadrante(index)} 
-                                  style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                  className="btn-partes-accion-del"
                                   title="Eliminar este registro"
                                 >
-                                  ✕
+                                  X
                                 </button>
                               )}
                             </div>
