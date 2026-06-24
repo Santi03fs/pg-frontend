@@ -38,6 +38,11 @@ function App() {
   const [asistencias, setAsistencias] = useState([]);
   const [gastos, setGastos] = useState([]);
 
+  // ================= ESTADOS PARTIDAS =================
+  const [partidas, setPartidas] = useState([]);
+  const [obraSeleccionadaPartidas, setObraSeleccionadaPartidas] = useState(null);
+  const [partidasObra, setPartidasObra] = useState([]);
+
   // Estados para Edición de Trabajador
   const [idTrabajadorEdit, setIdTrabajadorEdit] = useState(null);
   const [horasJornadaTrabajador, setHorasJornadaTrabajador] = useState('8.0');
@@ -113,6 +118,7 @@ function App() {
     cargarTrabajadores(); 
     cargarAsistencias(); 
     cargarGastos();
+    cargarPartidas();
     
     // Cargar usuarios si es admin
     const userStored = localStorage.getItem('pg_user') || sessionStorage.getItem('pg_user');
@@ -126,6 +132,8 @@ function App() {
       }
     }
   };
+
+  const cargarPartidas = () => fetch(`${API_BASE_URL}/api/partidas`).then(res => res.json()).then(setPartidas).catch(err => console.error("Error al cargar partidas:", err));
 
   const cargarUsuarios = () => {
     fetch(`${API_BASE_URL}/api/usuarios`)
@@ -216,26 +224,89 @@ function App() {
         const diaSemana = fechaActual.getDay();
         const fechaStr = `${year}-${month}-${String(i).padStart(2, '0')}`;
         
-        const parteDb = asistencias.find(a => Number(a.idTrabajador) === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
+        const partesDb = asistencias.filter(a => Number(a.idTrabajador) === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
         
-        nuevoCuadrante.push({
-          nDia: i, 
-          nMes: nombresMeses[fechaActual.getMonth()], 
-          nSem: nombresDias[diaSemana],
-          esFinde: diaSemana === 0 || diaSemana === 6,
-          fechaStr,
-          idAsis: parteDb ? parteDb.id : null,
-          asistencia: parteDb ? (parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No')) : '',
-          horario: parteDb && parteDb.horario ? parteDb.horario : '',
-          idObra: parteDb ? parteDb.idObra : '',
-          horas: parteDb ? parteDb.horasTrabajadas : '',
-          pagado: parteDb && parteDb.pagado ? 'Sí' : 'No', 
-          descripcionExtra: parteDb && parteDb.descripcion ? parteDb.descripcion : '' 
-        });
+        if (partesDb.length === 0) {
+          nuevoCuadrante.push({
+            nDia: i, 
+            nMes: nombresMeses[fechaActual.getMonth()], 
+            nSem: nombresDias[diaSemana],
+            esFinde: diaSemana === 0 || diaSemana === 6,
+            fechaStr,
+            idAsis: null,
+            asistencia: '',
+            horario: '',
+            idObra: '',
+            horas: '',
+            pagado: 'No', 
+            descripcionExtra: '' 
+          });
+        } else {
+          partesDb.forEach(parteDb => {
+            nuevoCuadrante.push({
+              nDia: i, 
+              nMes: nombresMeses[fechaActual.getMonth()], 
+              nSem: nombresDias[diaSemana],
+              esFinde: diaSemana === 0 || diaSemana === 6,
+              fechaStr,
+              idAsis: parteDb.id,
+              asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No'),
+              horario: parteDb.horario || '',
+              idObra: parteDb.idObra || '',
+              horas: parteDb.horasTrabajadas !== undefined ? parteDb.horasTrabajadas : '',
+              pagado: parteDb.pagado ? 'Sí' : 'No', 
+              descripcionExtra: parteDb.descripcion || '' 
+            });
+          });
+        }
       }
       setCuadrante(nuevoCuadrante);
     }
   }, [mesFiltro, trabajadorFiltro, asistencias, obras]);
+
+  const handleAddRowCuadrante = (index) => {
+    const targetDay = cuadrante[index];
+    const newRow = {
+      nDia: targetDay.nDia,
+      nMes: targetDay.nMes,
+      nSem: targetDay.nSem,
+      esFinde: targetDay.esFinde,
+      fechaStr: targetDay.fechaStr,
+      idAsis: null,
+      asistencia: 'Sí',
+      horario: '',
+      idObra: '',
+      horas: '',
+      pagado: 'No',
+      descripcionExtra: '',
+      isNewRow: true
+    };
+    const copia = [...cuadrante];
+    copia.splice(index + 1, 0, newRow);
+    setCuadrante(copia);
+  };
+
+  const handleRemoveRowCuadrante = async (index) => {
+    const targetRow = cuadrante[index];
+    if (targetRow.idAsis) {
+      if (window.confirm("⚠️ ¿Estás seguro de que quieres eliminar este parte de asistencia?")) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/asistencias/${targetRow.idAsis}`, { method: 'DELETE' });
+          if (res.ok) {
+            cargarAsistencias();
+          } else {
+            alert("Error al eliminar el registro.");
+          }
+        } catch (e) {
+          console.error("Error al eliminar:", e);
+        }
+      }
+    } else {
+      const copia = [...cuadrante];
+      copia.splice(index, 1);
+      setCuadrante(copia);
+    }
+  };
 
   const handleEditCuadrante = (index, campo, valor) => {
     const copia = [...cuadrante];
@@ -605,7 +676,41 @@ function App() {
   const guardarObra = (e) => { 
     e.preventDefault(); 
     fetch(`${API_BASE_URL}/api/obras`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, nombreObra, fechaInicio }) })
-    .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); }); 
+    .then(() => { setCliente(''); setNombreObra(''); setFechaInicio(''); cargarObras(); cargarPartidas(); }); 
+  };
+
+  const handleSavePartida = async (partidaId, nuevoNombre) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/partidas/${partidaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nuevoNombre })
+      });
+      if (res.ok) {
+        cargarPartidas(); // Refresh global list
+        cargarAsistencias(); // Refresh asistencias
+      }
+    } catch (e) {
+      console.error("Error al guardar partida:", e);
+    }
+  };
+
+  const handleSaveAllPartidas = async () => {
+    try {
+      for (const p of partidasObra) {
+        await fetch(`${API_BASE_URL}/api/partidas/${p.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre: p.nombre })
+        });
+      }
+      alert("¡Todas las partidas se han guardado con éxito!");
+      cargarPartidas();
+      cargarAsistencias();
+    } catch (e) {
+      console.error("Error al guardar todas las partidas:", e);
+      alert("Error al guardar algunas partidas.");
+    }
   };
   
   const toggleEstadoObra = async (id, estadoActual) => {
@@ -1067,18 +1172,9 @@ function App() {
                                   onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'partida', e.target.value)}
                                 >
                                   <option value="">-- Partida --</option>
-                                  <option value="Cimentación">Cimentación</option>
-                                  <option value="Estructura">Estructura</option>
-                                  <option value="Albañilería">Albañilería</option>
-                                  <option value="Yeso y Pladur">Yeso y Pladur</option>
-                                  <option value="Electricidad">Electricidad</option>
-                                  <option value="Fontanería">Fontanería</option>
-                                  <option value="Pintura">Pintura</option>
-                                  <option value="Alicatados">Alicatados</option>
-                                  <option value="Carpintería">Carpintería</option>
-                                  <option value="Cerrajería">Cerrajería</option>
-                                  <option value="Limpieza">Limpieza</option>
-                                  <option value="Varios">Varios</option>
+                                  {partidas
+                                    .filter(p => Number(p.idObra) === Number(obraAsig.idObra))
+                                    .map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                                 </select>
 
                                 {/* Descripción */}
@@ -1198,7 +1294,7 @@ function App() {
             </form>
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
-                <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th><th>Informes</th></tr></thead>
+                <thead><tr style={{background: '#3498db'}}><th>ID</th><th>Cliente</th><th>Obra</th><th>Inicio</th><th>Estado</th><th>Partidas</th><th>Informes</th></tr></thead>
                 <tbody>
                   {obras.map(o => (
                     <tr key={o.id} style={{ opacity: o.finalizada ? 0.6 : 1, backgroundColor: o.finalizada ? '#fdfdfd' : 'white', transition: '0.3s' }}>
@@ -1220,6 +1316,21 @@ function App() {
                         </label>
                       </td>
                       <td>
+                        <button 
+                          onClick={() => {
+                            setObraSeleccionadaPartidas(o);
+                            fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`)
+                              .then(res => res.json())
+                              .then(setPartidasObra)
+                              .catch(err => console.error("Error al cargar partidas de obra:", err));
+                          }} 
+                          className="btn-excel" 
+                          style={{ backgroundColor: '#e67e22', padding: '6px 12px' }}
+                        >
+                          ✏️ Configurar
+                        </button>
+                      </td>
+                      <td>
                         <button onClick={() => exportarObraExcel(o.id)} className="btn-excel" title="Descargar datos de la obra en Excel">
                           📥 Exportar a Excel
                         </button>
@@ -1229,6 +1340,57 @@ function App() {
                 </tbody>
               </table>
             </div>
+
+            {/* CONFIGURACIÓN DE PARTIDAS */}
+            {obraSeleccionadaPartidas && (
+              <div className="card" style={{ marginTop: '20px', borderTop: '4px solid #e67e22', backgroundColor: '#fdfdfd', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h3 style={{ margin: 0, color: '#2c3e50' }}>✏️ Configurar Partidas: <span style={{color: '#e67e22'}}>{obraSeleccionadaPartidas.nombreObra}</span></h3>
+                  <button 
+                    onClick={() => setObraSeleccionadaPartidas(null)} 
+                    style={{ background: '#7f8c8d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+                <p style={{ fontSize: '13px', color: '#7f8c8d', marginTop: 0, marginBottom: '20px' }}>Modifica el nombre de cualquiera de las 30 partidas de esta obra. Los cambios se actualizarán automáticamente en todos los partes de horas asociados.</p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '15px' }}>
+                  {partidasObra.map((p, idx) => (
+                    <div key={p.id} style={{ display: 'flex', gap: '5px', alignItems: 'center', background: 'white', padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                      <span style={{ fontWeight: 'bold', color: '#7f8c8d', minWidth: '25px', fontSize: '13px' }}>#{p.numero}</span>
+                      <input 
+                        className="input-standard" 
+                        style={{ padding: '6px', fontSize: '13px', flex: 1 }} 
+                        value={p.nombre || ''} 
+                        onChange={(e) => {
+                          const nuevas = [...partidasObra];
+                          nuevas[idx].nombre = e.target.value;
+                          setPartidasObra(nuevas);
+                        }} 
+                      />
+                      <button 
+                        onClick={() => handleSavePartida(p.id, p.nombre)} 
+                        style={{ background: '#2ecc71', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        title="Guardar esta partida"
+                      >
+                        💾
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <button 
+                    onClick={handleSaveAllPartidas} 
+                    className="btn-action" 
+                    style={{ backgroundColor: '#2ecc71', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}
+                  >
+                    💾 Guardar Todas las Partidas
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -1395,6 +1557,7 @@ function App() {
                       <th style={{ border: '1px solid black', padding: '6px', width: '6%' }}>Horas</th>
                       <th style={{ border: '1px solid black', padding: '6px', width: '8%' }}>Pagado</th>
                       <th style={{ border: '1px solid black', padding: '6px', width: '21%' }}>Descripción</th>
+                      <th className="no-print" style={{ border: '1px solid black', padding: '6px', width: '5%' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1445,6 +1608,28 @@ function App() {
                           </td>
                           <td style={{ border: '1px solid black' }}>
                             <input className="input-paper" value={diaInfo.descripcionExtra} onChange={e => handleEditCuadrante(index, 'descripcionExtra', e.target.value)} />
+                          </td>
+                          <td className="no-print" style={{ border: '1px solid black' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => handleAddRowCuadrante(index)} 
+                                style={{ background: '#e67e22', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                title="Añadir obra a este día"
+                              >
+                                +
+                              </button>
+                              {(diaInfo.idAsis || diaInfo.isNewRow) && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveRowCuadrante(index)} 
+                                  style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontWeight: 'bold' }}
+                                  title="Eliminar este registro"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
