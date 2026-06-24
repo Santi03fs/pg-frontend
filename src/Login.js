@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 
 // Dynamic API Base URL depending on environment
@@ -24,6 +24,17 @@ export default function Login({ onLoginSuccess }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Prefill remembered credentials on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('pg_remembered_username');
+    const savedPass = localStorage.getItem('pg_remembered_password');
+    if (savedUser && savedPass) {
+      setUsername(savedUser);
+      setPassword(savedPass);
+      setRememberMe(true);
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -45,9 +56,15 @@ export default function Login({ onLoginSuccess }) {
         if (rememberMe) {
           localStorage.setItem('pg_session', 'authenticated');
           localStorage.setItem('pg_user', JSON.stringify(userObj));
+          // Save credentials for prefill
+          localStorage.setItem('pg_remembered_username', cleanUser);
+          localStorage.setItem('pg_remembered_password', cleanPass);
         } else {
           sessionStorage.setItem('pg_session', 'authenticated');
           sessionStorage.setItem('pg_user', JSON.stringify(userObj));
+          // Clear saved credentials
+          localStorage.removeItem('pg_remembered_username');
+          localStorage.removeItem('pg_remembered_password');
         }
         
         onLoginSuccess(userObj);
