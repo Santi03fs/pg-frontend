@@ -13,7 +13,7 @@ window.fetch = async function (input, init = {}) {
     if (!url.includes('/api/usuarios/login') && !url.includes('/api/health')) {
       const token = localStorage.getItem('pg_token') || sessionStorage.getItem('pg_token');
       if (token && !headers.has('Authorization')) {
-        headers.set('Authorization', Bearer );
+        headers.set('Authorization', 'Bearer ' + token);
       }
     }
     init.headers = headers;

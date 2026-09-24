@@ -110,10 +110,7 @@ function App() {
   
   const [nombreTrabajador, setNombreTrabajador] = useState('');
   
-  const [fechaAsistencia, setFechaAsistencia] = useState('');
-  const [idTrabajadorSel, setIdTrabajadorSel] = useState('');
-  const [idObraSelAsis, setIdObraSelAsis] = useState('');
-  const [horas, setHoras] = useState('');
+
   
   const [idObraSelGasto, setIdObraSelGasto] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -130,7 +127,7 @@ function App() {
   const [cuadrante, setCuadrante] = useState([]); 
   
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
-  const [filtroTrabajadorAsis, setFiltroTrabajadorAsis] = useState('');
+
 
   // ================= SEGURIDAD E INACTIVIDAD =================
   const updateActivity = () => {
@@ -261,6 +258,7 @@ function App() {
       window.removeEventListener('pg_session_expired', handleApiExpired);
       events.forEach(ev => window.removeEventListener(ev, onUserActivity));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, showInactivityWarning]);
 
   useEffect(() => {
