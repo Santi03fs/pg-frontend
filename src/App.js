@@ -309,6 +309,9 @@ function App() {
     } else if (r === 'Hotel') {
       bg = '#16a085'; // Hotel (verde azulado)
       icon = '🏨';
+    } else if (r === 'EXTRA') {
+      bg = '#d35400'; // Extra
+      icon = '⭐';
     }
     return (
       <span style={{ backgroundColor: bg, color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -719,6 +722,31 @@ function App() {
       alert("¡Asistencia diaria guardada con éxito!");
       cargarAsistencias();
     } catch (error) { alert("Error al guardar los datos de asistencia."); } finally { setGuardando(false); }
+  };
+
+  const toggleExtraTrabajadorDirecto = async (t) => {
+    const nuevoEsExtra = !(t.esExtra || t.rol === 'EXTRA');
+    const rolActual = t.rol === 'EXTRA' ? 'Obra' : (t.rol || 'Obra');
+    const payload = {
+      ...t,
+      rol: rolActual,
+      esExtra: nuevoEsExtra
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/trabajadores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        cargarTrabajadores();
+      } else {
+        alert("Error al actualizar el estado EXTRA del trabajador.");
+      }
+    } catch (error) {
+      console.error("Error al cambiar rol EXTRA:", error);
+      alert("Error de conexión al actualizar el trabajador.");
+    }
   };
 
   const iniciarEdicionTrabajador = (t) => {
@@ -1300,14 +1328,14 @@ function App() {
                             <span style={{ 
                               fontWeight: 'bold', 
                               fontSize: '15px', 
-                              color: fila.esExtra ? '#d35400' : '#2c3e50',
-                              textDecoration: fila.esExtra ? 'underline 2.5px #e67e22' : 'none',
+                              color: (fila.esExtra || fila.rol === 'EXTRA') ? '#d35400' : '#2c3e50',
+                              textDecoration: (fila.esExtra || fila.rol === 'EXTRA') ? 'underline 2.5px #e67e22' : 'none',
                               textUnderlineOffset: '4px'
                             }}>
                               {fila.nombre}
                             </span>
                             {getRolBadge(fila.rol)}
-                            {fila.esExtra && getExtraBadge()}
+                            {(fila.esExtra || fila.rol === 'EXTRA') && fila.rol !== 'EXTRA' && getExtraBadge()}
                           </div>
                           <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                             <span style={{ fontSize: '11px', background: '#ebf5fb', color: '#2980b9', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>Jornada: {fila.horasJornada}h</span>
@@ -1554,17 +1582,43 @@ function App() {
             <div style={{ backgroundColor: '#e8f8f5', padding: '15px', borderRadius: '8px', borderLeft: '5px solid #1abc9c', marginBottom: '20px' }}>
               <h4 style={{ margin: '0 0 10px 0', color: '#16a085' }}>💡 Guía para añadir trabajadores</h4>
               <ul style={{ margin: 0, paddingLeft: '20px', color: '#2c3e50', fontSize: '14px', lineHeight: '1.5' }}>
-                <li><strong>Rol:</strong> Puedes clasificar a cada persona en <strong>Oficina</strong>, <strong>Obra</strong> o <strong>Hotel</strong> para pasar lista más rápido.</li>
+                <li><strong>Rol:</strong> Clasifica a cada persona en <strong>Oficina</strong>, <strong>Obra</strong>, <strong>Hotel</strong> o asígnale el rol <strong>⭐ EXTRA</strong> (si asiste excepcionalmente).</li>
                 <li><strong>Jornada (h):</strong> Horas totales que debe trabajar al día. El sistema te avisará en el Diario si no llega a este número.</li>
                 <li><strong>Pago Diario (€):</strong> Lo que cobra por defecto un día normal de trabajo.</li>
               </ul>
             </div>
             <form onSubmit={guardarTrabajador} className="form-grid-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <input className="input-standard" placeholder="Nombre Completo" value={nombreTrabajador} onChange={e=>setNombreTrabajador(e.target.value)} required />
-              <select className="input-standard" value={rolTrabajador} onChange={e=>setRolTrabajador(e.target.value)} required>
+              <select 
+                className="input-standard" 
+                value={
+                  esExtraTrabajador 
+                    ? (rolTrabajador === 'EXTRA' ? 'EXTRA' : `${rolTrabajador || 'Obra'}_EXTRA`) 
+                    : (rolTrabajador || 'Obra')
+                } 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'EXTRA') {
+                    setRolTrabajador('Obra');
+                    setEsExtraTrabajador(true);
+                  } else if (val.endsWith('_EXTRA')) {
+                    const base = val.replace('_EXTRA', '');
+                    setRolTrabajador(base);
+                    setEsExtraTrabajador(true);
+                  } else {
+                    setRolTrabajador(val);
+                    setEsExtraTrabajador(false);
+                  }
+                }} 
+                required
+              >
                 <option value="Obra">🏗️ Obra</option>
                 <option value="Oficina">🏢 Oficina</option>
                 <option value="Hotel">🏨 Hotel</option>
+                <option value="EXTRA" style={{ fontWeight: 'bold', color: '#d35400' }}>⭐ Rol EXTRA (Excepcional)</option>
+                <option value="Obra_EXTRA">🏗️ Obra + ⭐ EXTRA</option>
+                <option value="Oficina_EXTRA">🏢 Oficina + ⭐ EXTRA</option>
+                <option value="Hotel_EXTRA">🏨 Hotel + ⭐ EXTRA</option>
               </select>
               <input type="number" step="0.5" className="input-standard" placeholder="Horas Jornada (Ej: 8.0)" value={horasJornadaTrabajador} onChange={e=>setHorasJornadaTrabajador(e.target.value)} required />
               <input type="number" step="1" className="input-standard" placeholder="Pago Diario (€) (Ej: 120)" value={pagoDiarioTrabajador} onChange={e=>setPagoDiarioTrabajador(e.target.value)} required />
@@ -1591,9 +1645,9 @@ function App() {
                       <td>{t.id}</td>
                       <td>
                         <strong style={{ 
-                          textDecoration: t.esExtra ? 'underline 2.5px #e67e22' : 'none', 
+                          textDecoration: (t.esExtra || t.rol === 'EXTRA') ? 'underline 2.5px #e67e22' : 'none', 
                           textUnderlineOffset: '4px',
-                          color: t.esExtra ? '#d35400' : 'inherit'
+                          color: (t.esExtra || t.rol === 'EXTRA') ? '#d35400' : 'inherit'
                         }}>
                           {t.nombre}
                         </strong>
@@ -1601,7 +1655,28 @@ function App() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {getRolBadge(t.rol)}
-                          {t.esExtra && getExtraBadge()}
+                          {(t.esExtra || t.rol === 'EXTRA') && t.rol !== 'EXTRA' && getExtraBadge()}
+                          <button
+                            type="button"
+                            onClick={() => toggleExtraTrabajadorDirecto(t)}
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              border: (t.esExtra || t.rol === 'EXTRA') ? '1px solid #d35400' : '1px solid #cbd5e1',
+                              backgroundColor: (t.esExtra || t.rol === 'EXTRA') ? '#fff7ed' : '#f8fafc',
+                              color: (t.esExtra || t.rol === 'EXTRA') ? '#c2410c' : '#64748b',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              transition: 'all 0.2s'
+                            }}
+                            title="Poner o quitar rol EXTRA para este trabajador"
+                          >
+                            {(t.esExtra || t.rol === 'EXTRA') ? '⭐ Quitar EXTRA' : '+ Poner EXTRA'}
+                          </button>
                         </div>
                       </td>
                       <td style={{ fontWeight: 'bold' }}>{t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0} h</td>
