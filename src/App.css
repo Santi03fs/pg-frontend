@@ -1,0 +1,341 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+/* =========================================
+   VARIABLES Y ESTILOS GLOBALES
+========================================= */
+:root {
+  --bg-color: #f4f7fa;
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --primary: #0f172a; /* Azul Marino muy oscuro, solidez */
+  --accent: #ea580c; /* Naranja Construcción */
+  --accent-hover: #c2410c;
+  --border-color: #e2e8f0;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --radius: 8px;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-color);
+  font-family: 'Inter', sans-serif;
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* =========================================
+   CABECERA Y NAVEGACIÓN
+========================================= */
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--card-bg);
+  padding: 20px 32px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 32px;
+  border: 1px solid var(--border-color);
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-nav {
+  padding: 10px 18px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.btn-nav:hover {
+  background-color: #e2e8f0;
+  color: var(--text-main);
+}
+
+.btn-nav.active {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-logout-header {
+  border-color: #fecaca;
+  color: #ef4444;
+  background-color: #fef2f2;
+}
+.btn-logout-header:hover {
+  background-color: #ef4444;
+  color: white;
+}
+
+/* =========================================
+   TARJETAS Y FORMULARIOS
+========================================= */
+.card {
+  background: var(--card-bg);
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+}
+
+.form-grid, .form-grid-5 {
+  display: grid;
+  gap: 16px;
+  background: #f8fafc;
+  padding: 24px;
+  border-radius: var(--radius);
+  margin-bottom: 32px;
+  border: 1px solid var(--border-color);
+}
+
+.form-grid { grid-template-columns: repeat(4, 1fr); }
+.form-grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+.filtro-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-standard {
+  padding: 12px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-standard:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
+}
+
+/* =========================================
+   BOTONES Y SPINNER
+========================================= */
+.btn-action {
+  padding: 12px 24px;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  background-color: var(--primary);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-action:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-delete { background-color: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px;}
+.btn-delete:hover { background-color: #dc2626; box-shadow: var(--shadow-sm); }
+
+.btn-excel { background-color: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 13px; }
+.btn-excel:hover { background-color: #059669; box-shadow: var(--shadow-sm); }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 16px; 
+  height: 16px; 
+  border: 2px solid white; 
+  border-top-color: transparent; 
+  border-radius: 50%; 
+  display: inline-block; 
+  animation: spin 1s linear infinite;
+}
+
+/* =========================================
+   INTERRUPTOR (SWITCH ESTADO OBRA)
+========================================= */
+.switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch-input { width: 40px; height: 20px; appearance: none; background: #ef4444; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: 0.3s; margin: 0;}
+.switch-input:checked { background: #10b981; }
+.switch-input::before { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: white; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.switch-input:checked::before { transform: translateX(20px); }
+
+/* =========================================
+   TABLAS PROFESIONALES
+========================================= */
+.tabla-general {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.tabla-general th {
+  padding: 16px;
+  background-color: var(--primary);
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tabla-general th:first-child { border-top-left-radius: var(--radius); }
+.tabla-general th:last-child { border-top-right-radius: var(--radius); }
+
+.tabla-general td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.tabla-general tr:last-child td { border-bottom: none; }
+.tabla-general tbody tr:hover { background-color: #f8fafc; }
+
+/* Tarjetas de Gastos */
+.tarjetas-resultados { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
+
+/* =========================================
+   ESTILOS DEL CUADRANTE (INFORMES)
+========================================= */
+.input-paper { width: 100%; border: 1px solid #ddd; padding: 5px; font-size: 12px; outline: none; border-radius: 4px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
+.input-paper:focus { border-color: #3498db; background: white; }
+
+.btn-partes-accion-add {
+  background-color: #27ae60 !important; color: white !important; border: none !important; border-radius: 50% !important;
+  width: 26px !important; height: 26px !important; display: flex !important; align-items: center !important; justify-content: center !important;
+  font-weight: 900 !important; font-size: 16px !important; cursor: pointer !important; transition: all 0.2s ease-in-out !important;
+}
+.btn-partes-accion-add:hover { background-color: #2ecc71 !important; transform: scale(1.15) !important; }
+
+.btn-partes-accion-del {
+  background-color: #c0392b !important; color: white !important; border: none !important; border-radius: 50% !important;
+  width: 26px !important; height: 26px !important; display: flex !important; align-items: center !important; justify-content: center !important;
+  font-weight: 900 !important; font-size: 12px !important; cursor: pointer !important; transition: all 0.2s ease-in-out !important;
+}
+.btn-partes-accion-del:hover { background-color: #e74c3c !important; transform: scale(1.15) !important; }
+
+/* =========================================
+   RESPONSIVE (MÓVILES Y TABLETS)
+========================================= */
+@media (max-width: 1024px) {
+  .form-grid, .form-grid-5 { grid-template-columns: repeat(2, 1fr); }
+  .btn-action.full-width-mobile { grid-column: span 2; }
+}
+
+@media (max-width: 768px) {
+  .app-container { padding: 12px; }
+  .card { padding: 20px; }
+  .header-container { flex-direction: column; gap: 16px; text-align: center; }
+  .nav-buttons { flex-wrap: wrap; justify-content: center; width: 100%; }
+  .btn-nav { flex: 1 1 calc(33% - 10px); font-size: 12px; padding: 10px 4px; }
+  
+  .form-grid, .form-grid-5 { grid-template-columns: 1fr; }
+  .btn-action.full-width-mobile { grid-column: span 1; }
+  
+  .tarjetas-resultados { grid-template-columns: 1fr; gap: 12px; }
+  .filtro-container { flex-direction: column; align-items: flex-start; width: 100%; }
+  .filtro-container select, .filtro-container input { width: 100% !important; }
+}
+
+/* =========================================
+   IMPRESIÓN (PDF y PAPEL)
+========================================= */
+@media print {
+  @page {
+    size: portrait;
+    margin: 8mm 6mm;
+  }
+  .no-print { display: none !important; }
+  body { 
+    background-color: white !important; 
+    padding: 0 !important; 
+    margin: 0 !important; 
+    font-size: 10px !important; 
+  }
+  .app-container { 
+    padding: 0 !important; 
+    margin: 0 !important; 
+    max-width: 100% !important; 
+    width: 100% !important; 
+  }
+  .card-box { 
+    box-shadow: none !important; 
+    padding: 0 !important; 
+    border: none !important; 
+    margin: 0 !important; 
+    background: transparent !important; 
+  }
+  div { overflow: visible !important; }
+  
+  .tabla-papel { 
+    width: 100% !important; 
+    min-width: 0 !important; 
+    max-width: 100% !important; 
+    border: 1.5px solid black !important; 
+    border-collapse: collapse !important; 
+    background: white !important; 
+    table-layout: fixed !important; 
+  }
+  .tabla-papel th, .tabla-papel td { 
+    border: 1px solid black !important; 
+    font-size: 9px !important; 
+    padding: 3px 2px !important; 
+    color: black !important; 
+    word-wrap: break-word !important; 
+    overflow-wrap: break-word !important; 
+  }
+  
+  .fondo-amarillo { 
+    background-color: #fff200 !important; 
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+  }
+  
+  .input-paper { 
+    border: none !important; 
+    background: transparent !important; 
+    color: black !important; 
+    width: 100% !important; 
+    font-size: 9px !important; 
+    padding: 0 !important; 
+    margin: 0 !important; 
+    text-align: center !important; 
+    -webkit-appearance: none; 
+    -moz-appearance: none; 
+    appearance: none; 
+  }
+
+  .resumen-totales-print {
+    margin-top: 10px !important;
+    border: 1.5px solid black !important;
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+  }
+}
