@@ -19,22 +19,96 @@ const LogoPG = () => (
 );
 
 const plantillaPartidasPredefinidas = [
-  "Albañilería",
-  "Carpintería de madera",
-  "Carpintería de aluminio / PVC",
-  "Cerrajería",
-  "Fontanería",
-  "Electricidad",
-  "Climatización / Aire acondicionado",
-  "Pladur / Tabiquería seca",
-  "Pintura",
-  "Solados y alicatados",
-  "Impermeabilización",
-  "Cubiertas y tejados",
-  "Demoliciones / Desescombro",
-  "Montajes y mantenimiento",
-  "Fachadas / Revestimientos"
+  "ESTRUCTURA",
+  "ALUMINIO",
+  "REVESTIMIENTO",
+  "MURO Y BARBACOA",
+  "PANEL SÁNDWICH",
+  "HERRAJES",
+  "VIDRIOS",
+  "MOBILIARIO DE COCINA",
+  "ALBAÑILERÍA",
+  "PINTURA",
+  "FONTANERÍA",
+  "ELECTRICIDAD",
+  "CAMPANA Y TUBOS",
+  "DEMOLICIONES Y DESESCOMBRO",
+  "REMATES Y LIMPIEZA"
 ];
+
+// Catálogo de fases de obra habituales organizadas por partida
+const fasesPredeterminadasPorPartida = {
+  'ESTRUCTURA': [
+    'Estructura techo',
+    'Fabricar estructura techo',
+    'Terminar estructura techo',
+    'Montando estructura',
+    'Preparar tubo y montar',
+    'Soldadura y anclajes',
+    'Montaje de pilares'
+  ],
+  'ALUMINIO': [
+    'Con el aluminio',
+    'Fabricando ventanas',
+    'Medir remates',
+    'Colocando remates aluminio',
+    'Remates aluminio',
+    'Montaje de hojas y cristales',
+    'Colocación de cercos'
+  ],
+  'REVESTIMIENTO': [
+    'Colocando suelo',
+    'Con el azulejo',
+    'Con los materiales',
+    'Enluciendo las paredes',
+    'Alicatado de paredes',
+    'Enlechado y juntas',
+    'Preparación de masa y mortero'
+  ],
+  'ALBAÑILERÍA': [
+    'Enluciendo las paredes',
+    'Con el muro',
+    'Levantando tabiques',
+    'Picado y desescombro',
+    'Regatas y tubos',
+    'Raseo de mortero',
+    'Maestreado de paredes'
+  ],
+  'MURO Y BARBACOA': [
+    'Con el muro',
+    'Remates barbacoa',
+    'Montando cocina',
+    'Colocación de bloques',
+    'Hormigonado y cimentación',
+    'Zuncho y remates'
+  ],
+  'PANEL SÁNDWICH': [
+    'Montaje panel sándwich',
+    'Colocación de remates',
+    'Sellado y fijación'
+  ],
+  'MOBILIARIO DE COCINA': [
+    'Montaje de cocina',
+    'Ajuste de muebles',
+    'Colocación de encimera'
+  ],
+  'PINTURA': [
+    'Lijado y masillado',
+    'Primera mano de pintura',
+    'Segunda mano de pintura',
+    'Pintado de techos'
+  ],
+  'FONTANERÍA': [
+    'Instalación de tuberías',
+    'Montaje de sanitarios',
+    'Desagües y bajantes'
+  ],
+  'ELECTRICIDAD': [
+    'Pasar cables y líneas',
+    'Colocación de mecanismos',
+    'Cuadro eléctrico'
+  ]
+};
 
 // ================= HORARIOS Y FRANJAS =================
 const horariosPredefinidos = [
@@ -296,6 +370,32 @@ function App() {
   const cargarGastos = () => fetch(`${API_BASE_URL}/api/gastos`).then(res => res.json()).then(setGastos).catch(err => console.error("Error al cargar gastos:", err));
 
   // ================= HELPERS Y CÁLCULOS FILTRADOS =================
+  const getFasesParaPartida = (nombrePartida, idObra) => {
+    const fasesGenericas = [
+      'Trabajos generales',
+      'Enluciendo las paredes',
+      'Colocando suelo',
+      'Con el muro',
+      'Remates y repaso',
+      'Picado y desescombro'
+    ];
+    if (!nombrePartida) return fasesGenericas;
+
+    const nombreNorm = nombrePartida.trim().toLowerCase();
+    const keyMatch = Object.keys(fasesPredeterminadasPorPartida).find(k => 
+      k.toLowerCase() === nombreNorm || nombreNorm.includes(k.toLowerCase()) || k.toLowerCase().includes(nombreNorm)
+    );
+    const fasesCatalogo = keyMatch ? fasesPredeterminadasPorPartida[keyMatch] : [];
+
+    // Fases ya utilizadas previamente en la base de datos para no repetirse
+    const fasesHistorico = asistencias
+      .filter(a => (a.partida || '').trim().toLowerCase() === nombreNorm)
+      .map(a => (a.descripcion || '').trim())
+      .filter(Boolean);
+
+    return [...new Set([...fasesCatalogo, ...fasesHistorico, ...fasesGenericas])];
+  };
+
   const getNombreObra = (id) => obras.find(o => Number(o.id) === Number(id))?.nombreObra || '';
   const getNombreTrabajador = (id) => trabajadores.find(t => Number(t.id) === Number(id))?.nombre || 'Desconocido';
   
@@ -938,7 +1038,7 @@ function App() {
     .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 
-  // ================= LA MAGIA DE EXPORTAR A EXCEL =================
+  // ================= LA MAGIA DE EXPORTAR A EXCEL (ESTRUCTURA EXACTA DE PARTIDAS Y FASES) =================
   const exportarObraExcel = (idObra) => {
     const targetId = Number(idObra);
     const obraTarget = obras.find(o => Number(o.id) === targetId);
@@ -957,71 +1057,233 @@ function App() {
     const gastosObra = gastos.filter(g => g.idObra && Number(g.idObra) === targetId);
 
     if (horasObra.length === 0 && gastosObra.length === 0) {
-      if (!window.confirm("⚠️ Esta obra no tiene horas ni gastos registrados. ¿Quieres descargar el Excel vacío de todas formas?")) return;
+      if (!window.confirm("⚠️ Esta obra no tiene horas ni gastos registrados. ¿Quieres descargar el archivo de todas formas?")) return;
     }
 
     const datosExcel = [];
-    datosExcel.push(["CLIENTE:", obraTarget.cliente || "", "", "", "", "", "", ""]);
+    
+    // 1. Cabecera superior idéntica a las fotos
+    datosExcel.push(["CLIENTE:", obraTarget.cliente || obraTarget.nombreObra || "", "", "", "", "", "", ""]);
     datosExcel.push(["FECHA:", new Date().toLocaleDateString('es-ES'), "", "", "", "", "", ""]);
-    datosExcel.push(["OBRA:", obraTarget.nombreObra || "", "", "", "", "", "", ""]);
-    datosExcel.push([]); datosExcel.push(["GASTOS", "", "", "", "", "", "", ""]); datosExcel.push([]);
-    datosExcel.push(["FECHA", "DESCRIPCIÓN", "PROV/TRABAJ.", "UDS./H", "NETO", "SUBTOTAL", "PVP", "SUBTOTAL"]);
+    datosExcel.push([]);
+    
+    // 2. Banner de título GASTOS
+    datosExcel.push(["GASTOS", "", "", "", "", "", "", ""]);
     datosExcel.push([]);
 
-    // HORAS
-    if (horasObra.length > 0) {
-      datosExcel.push(["", "ESTRUCTURA / MANO DE OBRA", "", "", "", "", "", ""]);
-      let totalHoras = 0;
-      horasObra.forEach(h => {
-        const horasTrabajadas = parseFloat(h.horasTrabajadas) || 0;
-        totalHoras += horasTrabajadas;
-        const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
-        const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
-        
-        // Conservar Partida y Descripción juntos para que la partida nunca se pierda
-        let detalleConcepto = "Mano de obra";
-        if (h.partida && h.descripcion && h.descripcion.trim() !== '') {
-          detalleConcepto = `${h.partida} - ${h.descripcion}`;
-        } else if (h.partida) {
-          detalleConcepto = h.partida;
-        } else if (h.descripcion && h.descripcion.trim() !== '') {
-          detalleConcepto = h.descripcion;
-        }
+    // 3. Encabezados de columnas exactos de la foto
+    datosExcel.push(["FECHA", "DESCRIPCIÓN", "PROV/TRABAJ", "UDS./H", "NETO", "SUBTOTAL", "PVP", "SUBTOTAL"]);
+    datosExcel.push([]);
 
-        datosExcel.push([ h.fecha || "", detalleConcepto, trabajadorObj ? trabajadorObj.nombre : "Desconocido", horasTrabajadas, "", "", "", "" ]);
-      });
-      datosExcel.push(["", "", "TOTAL H", totalHoras, "", "", "", ""]); datosExcel.push([]);
-    }
+    // 4. Recopilar todas las partidas ordenadas
+    const partidasObra = partidas.filter(p => Number(p.idObra) === targetId).sort((a,b) => (a.numero || 0) - (b.numero || 0));
+    const listaPartidas = [];
 
-    // GASTOS
+    partidasObra.forEach(p => {
+      if (p.nombre && !listaPartidas.some(x => x.toLowerCase() === p.nombre.trim().toLowerCase())) {
+        listaPartidas.push(p.nombre.trim());
+      }
+    });
+
+    horasObra.forEach(h => {
+      const p = (h.partida || '').trim();
+      if (p && !listaPartidas.some(x => x.toLowerCase() === p.toLowerCase())) {
+        listaPartidas.push(p);
+      }
+    });
+
+    gastosObra.forEach(g => {
+      const cat = (g.categoria || '').trim();
+      if (cat && !listaPartidas.some(x => x.toLowerCase() === cat.toLowerCase())) {
+        listaPartidas.push(cat);
+      }
+    });
+
+    let granTotalHoras = 0;
     let granTotalNeto = 0;
     let granTotalPvp = 0;
-    if (gastosObra.length > 0) {
-      const categorias = [...new Set(gastosObra.map(g => g.categoria || 'VARIOS'))];
-      categorias.forEach(cat => {
-        datosExcel.push(["", cat.toUpperCase(), "", "", "", "", "", ""]);
-        const gastosCat = gastosObra.filter(g => (g.categoria || 'VARIOS') === cat);
+
+    const horasYaProcesadas = new Set();
+    const gastosYaProcesados = new Set();
+
+    // 5. Generar bloques por cada PARTIDA
+    listaPartidas.forEach(partidaNombre => {
+      const pNorm = partidaNombre.toLowerCase();
+      const horasPartida = horasObra.filter(h => (h.partida || '').trim().toLowerCase() === pNorm);
+      const gastosPartida = gastosObra.filter(g => {
+        const cat = (g.categoria || '').trim().toLowerCase();
+        const desc = (g.descripcion || '').toLowerCase();
+        return cat === pNorm || desc.includes(pNorm);
+      });
+
+      if (horasPartida.length === 0 && gastosPartida.length === 0) return;
+
+      // TÍTULO DE PARTIDA (Fila destacada con el nombre de la partida)
+      datosExcel.push(["", partidaNombre.toUpperCase(), "", "", "", "", "", ""]);
+
+      // A) FASES DE TRABAJO Y OPERARIOS (Mano de Obra)
+      if (horasPartida.length > 0) {
+        horasPartida.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+        let subtotalHorasPartida = 0;
+
+        horasPartida.forEach(h => {
+          horasYaProcesadas.add(h.id);
+          const horas = parseFloat(h.horasTrabajadas) || 0;
+          subtotalHorasPartida += horas;
+          granTotalHoras += horas;
+
+          const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
+          const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
+          const nombreOperario = trabajadorObj ? trabajadorObj.nombre : (h.nombreTrabajador || "Operario");
+          const faseObra = h.descripcion && h.descripcion.trim() !== '' ? h.descripcion : "Trabajos de obra";
+
+          datosExcel.push([
+            h.fecha || "",
+            faseObra,
+            nombreOperario,
+            horas,
+            "",
+            "",
+            "",
+            "- €"
+          ]);
+        });
+
+        // Fila de cierre TOTAL H
+        datosExcel.push(["", "", "TOTAL H", subtotalHorasPartida, "", "", "", "- €"]);
+        datosExcel.push([]);
+      }
+
+      // B) MATERIALES ASOCIADOS A ESTA PARTIDA
+      if (gastosPartida.length > 0) {
+        datosExcel.push(["", "MATERIAL:", "", "", "", "", "", ""]);
+        let subtotalNetoPartida = 0;
+        let subtotalPvpPartida = 0;
+
+        gastosPartida.forEach(g => {
+          gastosYaProcesados.add(g.id);
+          const netoUnit = parseFloat(g.precioNeto) || 0;
+          const pvpUnit = parseFloat(g.precioPvp) || 0;
+          const uds = parseFloat(g.udsHoras) || 1;
+          const subNeto = netoUnit * uds;
+          const subPvp = pvpUnit * uds;
+          subtotalNetoPartida += subNeto;
+          subtotalPvpPartida += subPvp;
+          granTotalNeto += subNeto;
+          granTotalPvp += subPvp;
+
+          datosExcel.push([
+            g.fecha || "",
+            g.descripcion || "",
+            g.provTrabajador || "",
+            uds,
+            netoUnit > 0 ? netoUnit : "",
+            subNeto > 0 ? subNeto : "",
+            pvpUnit > 0 ? pvpUnit : "",
+            subPvp > 0 ? subPvp : ""
+          ]);
+        });
+
+        // Fila de cierre TOTAL €
+        datosExcel.push(["", "", "TOTAL €", "", "", subtotalNetoPartida > 0 ? subtotalNetoPartida : "", "", subtotalPvpPartida > 0 ? subtotalPvpPartida : ""]);
+        datosExcel.push([]);
+      }
+    });
+
+    // 6. Horas sin partida asignada si las hubiese
+    const horasSueltas = horasObra.filter(h => !horasYaProcesadas.has(h.id));
+    if (horasSueltas.length > 0) {
+      datosExcel.push(["", "TRABAJOS GENERALES", "", "", "", "", "", ""]);
+      let subHorasSueltas = 0;
+      horasSueltas.forEach(h => {
+        const horas = parseFloat(h.horasTrabajadas) || 0;
+        subHorasSueltas += horas;
+        granTotalHoras += horas;
+        const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
+        const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
+        const nombreOperario = trabajadorObj ? trabajadorObj.nombre : (h.nombreTrabajador || "Operario");
+
+        datosExcel.push([
+          h.fecha || "",
+          h.descripcion || "Mano de obra general",
+          nombreOperario,
+          horas,
+          "",
+          "",
+          "",
+          "- €"
+        ]);
+      });
+      datosExcel.push(["", "", "TOTAL H", subHorasSueltas, "", "", "", "- €"]);
+      datosExcel.push([]);
+    }
+
+    // 7. Materiales / Gastos restantes por categoría (Herrajes, Vidrios, etc.)
+    const gastosSueltos = gastosObra.filter(g => !gastosYaProcesados.has(g.id));
+    if (gastosSueltos.length > 0) {
+      const categoriasRestantes = [...new Set(gastosSueltos.map(g => (g.categoria || 'VARIOS').toUpperCase()))];
+      categoriasRestantes.forEach(cat => {
+        datosExcel.push(["", cat + ":", "", "", "", "", "", ""]);
         let subtotalCatNeto = 0;
         let subtotalCatPvp = 0;
-        gastosCat.forEach(g => {
-          const neto = parseFloat(g.precioNeto) || 0;
-          const pvp = parseFloat(g.precioPvp) || 0;
-          subtotalCatNeto += neto; subtotalCatPvp += pvp;
-          granTotalNeto += neto; granTotalPvp += pvp;
-          datosExcel.push([ g.fecha || "", g.descripcion || "", g.provTrabajador || "", g.udsHoras || 1, neto > 0 ? neto : "", neto > 0 ? neto : "", pvp > 0 ? pvp : "", pvp > 0 ? pvp : "" ]);
+
+        gastosSueltos.filter(g => (g.categoria || 'VARIOS').toUpperCase() === cat).forEach(g => {
+          const netoUnit = parseFloat(g.precioNeto) || 0;
+          const pvpUnit = parseFloat(g.precioPvp) || 0;
+          const uds = parseFloat(g.udsHoras) || 1;
+          const subNeto = netoUnit * uds;
+          const subPvp = pvpUnit * uds;
+          subtotalCatNeto += subNeto;
+          subtotalCatPvp += subPvp;
+          granTotalNeto += subNeto;
+          granTotalPvp += subPvp;
+
+          datosExcel.push([
+            g.fecha || "",
+            g.descripcion || "",
+            g.provTrabajador || "",
+            uds,
+            netoUnit > 0 ? netoUnit : "",
+            subNeto > 0 ? subNeto : "",
+            pvpUnit > 0 ? pvpUnit : "",
+            subPvp > 0 ? subPvp : ""
+          ]);
         });
-        datosExcel.push(["", "", "TOTAL " + cat.toUpperCase(), "", "", subtotalCatNeto > 0 ? subtotalCatNeto : "", "", subtotalCatPvp > 0 ? subtotalCatPvp : ""]); datosExcel.push([]);
+        datosExcel.push(["", "", "TOTAL €", "", "", subtotalCatNeto > 0 ? subtotalCatNeto : "", "", subtotalCatPvp > 0 ? subtotalCatPvp : ""]);
+        datosExcel.push([]);
       });
     }
-    datosExcel.push(["", "", "TOTAL €", "", "", granTotalNeto, "", granTotalPvp]);
+
+    // 8. Resumen global y entregas a cuenta tal como al final de la foto
+    datosExcel.push(["", "", "TOTAL GENERAL HORAS", granTotalHoras, "", "", "", "- €"]);
+    datosExcel.push(["", "", "TOTAL GENERAL NETO", "", "", granTotalNeto > 0 ? granTotalNeto : "", "", ""]);
+    datosExcel.push(["", "", "TOTAL GENERAL PVP", "", "", "", "", granTotalPvp > 0 ? granTotalPvp : ""]);
+    datosExcel.push([]);
+
+    const entrega1 = parseFloat(obraTarget.presupuestoPvp) || 0;
+    datosExcel.push(["ENTREGA A CUENTA 1 ()", "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
+    datosExcel.push(["ENTREGA A CUENTA 2 ()", "", "", "", "", "", "", ""]);
+    datosExcel.push(["TOTAL ENTREGAS", "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
 
     const hoja = XLSX.utils.aoa_to_sheet(datosExcel);
+
+    // Ajustar los anchos de columna para que quede idéntico al documento original
+    hoja['!cols'] = [
+      { wch: 12 }, // FECHA
+      { wch: 42 }, // DESCRIPCIÓN (Fase de obra / Material)
+      { wch: 22 }, // PROV/TRABAJ
+      { wch: 10 }, // UDS./H
+      { wch: 12 }, // NETO
+      { wch: 14 }, // SUBTOTAL NETO
+      { wch: 12 }, // PVP
+      { wch: 14 }  // SUBTOTAL PVP
+    ];
+
     const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, "Informe Obra");
-    XLSX.writeFile(libro, `Obra_${obraTarget.nombreObra.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(libro, hoja, "GASTOS");
+    XLSX.writeFile(libro, `Gastos_${(obraTarget.nombreObra || 'Obra').replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  // Ordenación y filtrado de las filas del control diario
   const filasDiarioFiltradas = filasDiario
     .filter(f => {
       if (filtroRolDiario === 'Todos') return true;
@@ -1430,14 +1692,56 @@ function App() {
                                       +
                                     </button>
 
-                                    {/* Partida */}
-                                    <select className="input-standard" style={{ padding: '6px', fontSize: '13px', flex: '1', minWidth: '100px' }} value={obraAsig.partida} onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'partida', e.target.value)}>
-                                      <option value="">-- Partida --</option>
-                                      {partidas.filter(p => Number(p.idObra) === Number(obraAsig.idObra)).map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                                    {/* Desplegable 1: Partida */}
+                                    <select 
+                                      className="input-standard" 
+                                      style={{ padding: '6px', fontSize: '13px', flex: '1.2', minWidth: '125px', borderColor: '#3498db' }} 
+                                      value={obraAsig.partida || ''} 
+                                      onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'partida', e.target.value)}
+                                    >
+                                      <option value="">-- 1. Partida --</option>
+                                      {(() => {
+                                        const partidasDeEstaObra = partidas.filter(p => Number(p.idObra) === Number(obraAsig.idObra));
+                                        if (partidasDeEstaObra.length > 0) {
+                                          return partidasDeEstaObra.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>);
+                                        }
+                                        return plantillaPartidasPredefinidas.map(nom => <option key={nom} value={nom}>{nom}</option>);
+                                      })()}
                                     </select>
 
-                                    {/* Descripción */}
-                                    <input className="input-standard" placeholder="Descripción..." style={{ padding: '6px', fontSize: '13px', flex: '1.5', minWidth: '130px' }} value={obraAsig.descripcion} onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value)} />
+                                    {/* Desplegable 2: Fase de obra (con selector rápido + datalist para escribir o autocompletar) */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flex: '1.8', minWidth: '170px' }}>
+                                      <input 
+                                        list={`fases-list-${fila.idTrabajador}-${idx}`}
+                                        className="input-standard" 
+                                        placeholder="-- 2. Fase de obra (ej: Enluciendo paredes) --" 
+                                        style={{ padding: '6px', fontSize: '13px', width: '100%', borderColor: '#e67e22' }} 
+                                        value={obraAsig.descripcion || ''} 
+                                        onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value)} 
+                                      />
+                                      <datalist id={`fases-list-${fila.idTrabajador}-${idx}`}>
+                                        {getFasesParaPartida(obraAsig.partida, obraAsig.idObra).map((fase, fIdx) => (
+                                          <option key={fIdx} value={fase}>{fase}</option>
+                                        ))}
+                                      </datalist>
+
+                                      <select
+                                        className="input-standard"
+                                        style={{ padding: '6px 4px', fontSize: '12px', width: '32px', cursor: 'pointer', backgroundColor: '#fff7ed', borderColor: '#e67e22' }}
+                                        title="Seleccionar fase de obra predefinida"
+                                        value=""
+                                        onChange={(e) => {
+                                          if (e.target.value) {
+                                            handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value);
+                                          }
+                                        }}
+                                      >
+                                        <option value="">▼</option>
+                                        {getFasesParaPartida(obraAsig.partida, obraAsig.idObra).map((fase, fIdx) => (
+                                          <option key={fIdx} value={fase}>{fase}</option>
+                                        ))}
+                                      </select>
+                                    </div>
 
                                     {/* Horas */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
