@@ -310,7 +310,7 @@ function App() {
       bg = '#16a085'; // Hotel (verde azulado)
       icon = '🏨';
     } else if (r === 'EXTRA') {
-      bg = '#d35400'; // Extra
+      bg = '#d35400'; // EXTRA (naranja destacado)
       icon = '⭐';
     }
     return (
@@ -752,8 +752,8 @@ function App() {
   const iniciarEdicionTrabajador = (t) => {
     setIdTrabajadorEdit(t.id); 
     setNombreTrabajador(t.nombre); 
-    setRolTrabajador(t.rol || 'Obra');
-    setEsExtraTrabajador(Boolean(t.esExtra));
+    setRolTrabajador(t.rol || (t.esExtra ? 'EXTRA' : 'Obra'));
+    setEsExtraTrabajador(Boolean(t.esExtra || t.rol === 'EXTRA'));
     setHorasJornadaTrabajador(t.horasJornada !== undefined && t.horasJornada !== null ? String(t.horasJornada) : '8.0');
     setPagoDiarioTrabajador(t.pagoDiario !== undefined && t.pagoDiario !== null ? String(t.pagoDiario) : '0.0');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -886,11 +886,12 @@ function App() {
 
   const guardarTrabajador = (e) => { 
     e.preventDefault(); 
+    const esExtraVal = rolTrabajador === 'EXTRA' || Boolean(esExtraTrabajador);
     const payload = { 
       id: idTrabajadorEdit, 
       nombre: nombreTrabajador, 
       rol: rolTrabajador || 'Obra',
-      esExtra: Boolean(esExtraTrabajador),
+      esExtra: esExtraVal,
       estado: 'Activo', 
       horasJornada: parseFloat(horasJornadaTrabajador) || 8.0, 
       pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0 
@@ -1024,11 +1025,12 @@ function App() {
   const filasDiarioFiltradas = filasDiario
     .filter(f => {
       if (filtroRolDiario === 'Todos') return true;
+      if (filtroRolDiario === 'Obra') return (f.rol || 'Obra') === 'Obra' || f.rol === 'EXTRA';
       return (f.rol || 'Obra') === filtroRolDiario;
     })
     .sort((a, b) => {
       if (ordenDiario === 'rol') {
-        const ordenRoles = { 'Oficina': 1, 'Obra': 2, 'Hotel': 3 };
+        const ordenRoles = { 'Oficina': 1, 'Obra': 2, 'Hotel': 3, 'EXTRA': 4 };
         const rolA = ordenRoles[a.rol] || 99;
         const rolB = ordenRoles[b.rol] || 99;
         if (rolA !== rolB) return rolA - rolB;
@@ -1582,55 +1584,21 @@ function App() {
             <div style={{ backgroundColor: '#e8f8f5', padding: '15px', borderRadius: '8px', borderLeft: '5px solid #1abc9c', marginBottom: '20px' }}>
               <h4 style={{ margin: '0 0 10px 0', color: '#16a085' }}>💡 Guía para añadir trabajadores</h4>
               <ul style={{ margin: 0, paddingLeft: '20px', color: '#2c3e50', fontSize: '14px', lineHeight: '1.5' }}>
-                <li><strong>Rol:</strong> Clasifica a cada persona en <strong>Oficina</strong>, <strong>Obra</strong>, <strong>Hotel</strong> o asígnale el rol <strong>⭐ EXTRA</strong> (si asiste excepcionalmente).</li>
+                <li><strong>Rol:</strong> Puedes clasificar a cada persona en <strong>Obra</strong>, <strong>Oficina</strong>, <strong>Hotel</strong> o <strong>⭐ EXTRA</strong>.</li>
                 <li><strong>Jornada (h):</strong> Horas totales que debe trabajar al día. El sistema te avisará en el Diario si no llega a este número.</li>
                 <li><strong>Pago Diario (€):</strong> Lo que cobra por defecto un día normal de trabajo.</li>
               </ul>
             </div>
-            <form onSubmit={guardarTrabajador} className="form-grid-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <form onSubmit={guardarTrabajador} className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <input className="input-standard" placeholder="Nombre Completo" value={nombreTrabajador} onChange={e=>setNombreTrabajador(e.target.value)} required />
-              <select 
-                className="input-standard" 
-                value={
-                  esExtraTrabajador 
-                    ? (rolTrabajador === 'EXTRA' ? 'EXTRA' : `${rolTrabajador || 'Obra'}_EXTRA`) 
-                    : (rolTrabajador || 'Obra')
-                } 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'EXTRA') {
-                    setRolTrabajador('Obra');
-                    setEsExtraTrabajador(true);
-                  } else if (val.endsWith('_EXTRA')) {
-                    const base = val.replace('_EXTRA', '');
-                    setRolTrabajador(base);
-                    setEsExtraTrabajador(true);
-                  } else {
-                    setRolTrabajador(val);
-                    setEsExtraTrabajador(false);
-                  }
-                }} 
-                required
-              >
+              <select className="input-standard" value={rolTrabajador} onChange={e=>setRolTrabajador(e.target.value)} required>
                 <option value="Obra">🏗️ Obra</option>
                 <option value="Oficina">🏢 Oficina</option>
                 <option value="Hotel">🏨 Hotel</option>
-                <option value="EXTRA" style={{ fontWeight: 'bold', color: '#d35400' }}>⭐ Rol EXTRA (Excepcional)</option>
-                <option value="Obra_EXTRA">🏗️ Obra + ⭐ EXTRA</option>
-                <option value="Oficina_EXTRA">🏢 Oficina + ⭐ EXTRA</option>
-                <option value="Hotel_EXTRA">🏨 Hotel + ⭐ EXTRA</option>
+                <option value="EXTRA">⭐ EXTRA</option>
               </select>
               <input type="number" step="0.5" className="input-standard" placeholder="Horas Jornada (Ej: 8.0)" value={horasJornadaTrabajador} onChange={e=>setHorasJornadaTrabajador(e.target.value)} required />
               <input type="number" step="1" className="input-standard" placeholder="Pago Diario (€) (Ej: 120)" value={pagoDiarioTrabajador} onChange={e=>setPagoDiarioTrabajador(e.target.value)} required />
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 'bold', color: '#d35400', cursor: 'pointer', background: '#fff7ed', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fed7aa' }}>
-                <input 
-                  type="checkbox" 
-                  checked={esExtraTrabajador} 
-                  onChange={e => setEsExtraTrabajador(e.target.checked)} 
-                  style={{ width: '16px', height: '16px', accentColor: '#e67e22' }}
-                />
-                ⭐ Rol EXTRA (excepcional)
-              </label>
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button type="submit" className="btn-action" style={{ backgroundColor: idTrabajadorEdit ? '#3498db' : '#2ecc71', flex: 2 }}>{idTrabajadorEdit ? '💾 Guardar Cambios' : '➕ Añadir Trabajador'}</button>
                 {idTrabajadorEdit && <button type="button" onClick={cancelarEdicionTrabajador} className="btn-action" style={{ backgroundColor: '#95a5a6', flex: 1 }}>❌ Cancelar Edición</button>}
