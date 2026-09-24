@@ -91,6 +91,7 @@ function App() {
   const [horasJornadaTrabajador, setHorasJornadaTrabajador] = useState('8.0');
   const [pagoDiarioTrabajador, setPagoDiarioTrabajador] = useState('0.0');
   const [rolTrabajador, setRolTrabajador] = useState('Obra'); // 'Oficina', 'Obra', 'Hotel'
+  const [esExtraTrabajador, setEsExtraTrabajador] = useState(false);
 
   // Estados para Edición de Obra
   const [idObraEdit, setIdObraEdit] = useState(null);
@@ -316,6 +317,29 @@ function App() {
     );
   };
 
+  const getExtraBadge = () => {
+    return (
+      <span 
+        style={{ 
+          backgroundColor: '#e67e22', 
+          color: 'white', 
+          padding: '3px 8px', 
+          borderRadius: '12px', 
+          fontSize: '11px', 
+          fontWeight: 'bold', 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          gap: '4px',
+          boxShadow: '0 1px 3px rgba(230, 126, 34, 0.35)',
+          letterSpacing: '0.3px'
+        }}
+        title="Asistencia Excepcional (EXTRA)"
+      >
+        ⭐ EXTRA
+      </span>
+    );
+  };
+
   const gastosFiltrados = filtroObraGastos 
     ? gastos.filter(g => Number(g.idObra) === parseInt(filtroObraGastos)) 
     : gastos;
@@ -478,18 +502,22 @@ function App() {
       const horasJornadaVal = t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0;
       const pagoDiarioVal = t.pagoDiario !== undefined && t.pagoDiario !== null ? t.pagoDiario : 0.0;
       const rolVal = t.rol || 'Obra';
+      const esExtraVal = asistenciasT.length > 0 && asistenciasT[0].esExtra !== undefined && asistenciasT[0].esExtra !== null
+        ? Boolean(asistenciasT[0].esExtra)
+        : Boolean(t.esExtra);
 
       const emptyObra = { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: pagoDiarioVal, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' };
 
       if (asistenciasT.length === 0) {
-        return { idTrabajador: t.id, nombre: t.nombre, rol: rolVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Ausente', idAsistenciaRaiz: null, obras: [emptyObra] };
+        return { idTrabajador: t.id, nombre: t.nombre, rol: rolVal, esExtra: esExtraVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Ausente', idAsistenciaRaiz: null, obras: [emptyObra] };
       } else {
         const registroRaiz = asistenciasT.find(a => a.idObra === null || !a.haAsistido);
         if (registroRaiz) {
-          return { idTrabajador: t.id, nombre: t.nombre, rol: rolVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: registroRaiz.estadoAsistencia || 'Ausente', idAsistenciaRaiz: registroRaiz.id, obras: [emptyObra] };
+          const esExtraRaiz = registroRaiz.esExtra !== undefined && registroRaiz.esExtra !== null ? Boolean(registroRaiz.esExtra) : esExtraVal;
+          return { idTrabajador: t.id, nombre: t.nombre, rol: rolVal, esExtra: esExtraRaiz, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: registroRaiz.estadoAsistencia || 'Ausente', idAsistenciaRaiz: registroRaiz.id, obras: [emptyObra] };
         } else {
           return {
-            idTrabajador: t.id, nombre: t.nombre, rol: rolVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Presente', idAsistenciaRaiz: null,
+            idTrabajador: t.id, nombre: t.nombre, rol: rolVal, esExtra: esExtraVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Presente', idAsistenciaRaiz: null,
             obras: asistenciasT.map(a => ({
               idAsistencia: a.id, idObra: a.idObra || '', partida: a.partida || '', descripcion: a.descripcion || '', tipoPago: a.tipoPago || 'Normal',
               pagoDia: a.pagoDia !== undefined && a.pagoDia !== null ? a.pagoDia : pagoDiarioVal, horasTrabajadas: a.horasTrabajadas !== undefined ? a.horasTrabajadas : '',
@@ -506,6 +534,15 @@ function App() {
     cargarAsistenciaDiariaDelDia();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fechaControlDiario, trabajadores, asistencias]);
+
+  const handleToggleExtra = (trabajadorId) => {
+    setFilasDiario(prev => prev.map(f => {
+      if (f.idTrabajador === trabajadorId) {
+        return { ...f, esExtra: !f.esExtra };
+      }
+      return f;
+    }));
+  };
 
   const handleCambiarEstadoAsistencia = (trabajadorId, nuevoEstado) => {
     setFilasDiario(prev => prev.map(f => {
@@ -630,6 +667,7 @@ function App() {
           pagoDia: 0.0,
           horasTrabajadas: 0,
           horasExtra: 0.0,
+          esExtra: Boolean(fila.esExtra),
           horario: '',
           partida: '',
           descripcion: '',
@@ -648,6 +686,7 @@ function App() {
             pagoDia: parseFloat(o.pagoDia) || 0.0,
             horasTrabajadas: parseFloat(o.horasTrabajadas) || 0.0,
             horasExtra: 0.0,
+            esExtra: Boolean(fila.esExtra),
             horario: o.horario || '',
             partida: o.partida || '',
             descripcion: o.descripcion || '',
@@ -686,6 +725,7 @@ function App() {
     setIdTrabajadorEdit(t.id); 
     setNombreTrabajador(t.nombre); 
     setRolTrabajador(t.rol || 'Obra');
+    setEsExtraTrabajador(Boolean(t.esExtra));
     setHorasJornadaTrabajador(t.horasJornada !== undefined && t.horasJornada !== null ? String(t.horasJornada) : '8.0');
     setPagoDiarioTrabajador(t.pagoDiario !== undefined && t.pagoDiario !== null ? String(t.pagoDiario) : '0.0');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -695,6 +735,7 @@ function App() {
     setIdTrabajadorEdit(null); 
     setNombreTrabajador(''); 
     setRolTrabajador('Obra');
+    setEsExtraTrabajador(false);
     setHorasJornadaTrabajador('8.0'); 
     setPagoDiarioTrabajador('0.0');
   };
@@ -821,6 +862,7 @@ function App() {
       id: idTrabajadorEdit, 
       nombre: nombreTrabajador, 
       rol: rolTrabajador || 'Obra',
+      esExtra: Boolean(esExtraTrabajador),
       estado: 'Activo', 
       horasJornada: parseFloat(horasJornadaTrabajador) || 8.0, 
       pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0 
@@ -829,6 +871,7 @@ function App() {
     .then(() => { 
       setNombreTrabajador(''); 
       setRolTrabajador('Obra');
+      setEsExtraTrabajador(false);
       setHorasJornadaTrabajador('8.0'); 
       setPagoDiarioTrabajador('0.0'); 
       setIdTrabajadorEdit(null); 
@@ -1254,11 +1297,41 @@ function App() {
                       <tr key={fila.idTrabajador} style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: fila.estadoAsistencia !== 'Presente' ? '#f9f9f9' : 'white' }}>
                         <td style={{ padding: '15px', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#2c3e50' }}>{fila.nombre}</span>
+                            <span style={{ 
+                              fontWeight: 'bold', 
+                              fontSize: '15px', 
+                              color: fila.esExtra ? '#d35400' : '#2c3e50',
+                              textDecoration: fila.esExtra ? 'underline 2.5px #e67e22' : 'none',
+                              textUnderlineOffset: '4px'
+                            }}>
+                              {fila.nombre}
+                            </span>
                             {getRolBadge(fila.rol)}
+                            {fila.esExtra && getExtraBadge()}
                           </div>
-                          <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                             <span style={{ fontSize: '11px', background: '#ebf5fb', color: '#2980b9', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>Jornada: {fila.horasJornada}h</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleExtra(fila.idTrabajador)}
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                border: fila.esExtra ? '1px solid #d35400' : '1px solid #cbd5e1',
+                                backgroundColor: fila.esExtra ? '#fff7ed' : '#f8fafc',
+                                color: fila.esExtra ? '#c2410c' : '#64748b',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              title="Marcar / desmarcar si vino de forma excepcional (EXTRA) hoy"
+                            >
+                              {fila.esExtra ? '⭐ Quitar EXTRA' : '+ Rol EXTRA'}
+                            </button>
                           </div>
                         </td>
 
@@ -1495,6 +1568,15 @@ function App() {
               </select>
               <input type="number" step="0.5" className="input-standard" placeholder="Horas Jornada (Ej: 8.0)" value={horasJornadaTrabajador} onChange={e=>setHorasJornadaTrabajador(e.target.value)} required />
               <input type="number" step="1" className="input-standard" placeholder="Pago Diario (€) (Ej: 120)" value={pagoDiarioTrabajador} onChange={e=>setPagoDiarioTrabajador(e.target.value)} required />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 'bold', color: '#d35400', cursor: 'pointer', background: '#fff7ed', padding: '6px 12px', borderRadius: '6px', border: '1px solid #fed7aa' }}>
+                <input 
+                  type="checkbox" 
+                  checked={esExtraTrabajador} 
+                  onChange={e => setEsExtraTrabajador(e.target.checked)} 
+                  style={{ width: '16px', height: '16px', accentColor: '#e67e22' }}
+                />
+                ⭐ Rol EXTRA (excepcional)
+              </label>
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button type="submit" className="btn-action" style={{ backgroundColor: idTrabajadorEdit ? '#3498db' : '#2ecc71', flex: 2 }}>{idTrabajadorEdit ? '💾 Guardar Cambios' : '➕ Añadir Trabajador'}</button>
                 {idTrabajadorEdit && <button type="button" onClick={cancelarEdicionTrabajador} className="btn-action" style={{ backgroundColor: '#95a5a6', flex: 1 }}>❌ Cancelar Edición</button>}
@@ -1507,8 +1589,21 @@ function App() {
                   {trabajadores.map(t => (
                     <tr key={t.id}>
                       <td>{t.id}</td>
-                      <td><strong>{t.nombre}</strong></td>
-                      <td>{getRolBadge(t.rol)}</td>
+                      <td>
+                        <strong style={{ 
+                          textDecoration: t.esExtra ? 'underline 2.5px #e67e22' : 'none', 
+                          textUnderlineOffset: '4px',
+                          color: t.esExtra ? '#d35400' : 'inherit'
+                        }}>
+                          {t.nombre}
+                        </strong>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {getRolBadge(t.rol)}
+                          {t.esExtra && getExtraBadge()}
+                        </div>
+                      </td>
                       <td style={{ fontWeight: 'bold' }}>{t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0} h</td>
                       <td style={{ fontWeight: 'bold', color: '#27ae60' }}>{t.pagoDiario !== undefined && t.pagoDiario !== null ? t.pagoDiario : 0} €</td>
                       <td>{t.estado}</td>
