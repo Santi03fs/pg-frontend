@@ -289,10 +289,10 @@ function App() {
 
   const cargarPartidas = () => fetch(`${API_BASE_URL}/api/partidas`).then(res => res.json()).then(setPartidas).catch(err => console.error("Error al cargar partidas:", err));
   const cargarUsuarios = () => fetch(`${API_BASE_URL}/api/usuarios`).then(res => res.json()).then(setUsuarios).catch(err => console.error("Error al cargar usuarios:", err));
-  const cargarObras = () => fetch(`${API_BASE_URL}/api/obras`).then(res => res.json()).then(setObras);
-  const cargarTrabajadores = () => fetch(`${API_BASE_URL}/api/trabajadores`).then(res => res.json()).then(setTrabajadores);
-  const cargarAsistencias = () => fetch(`${API_BASE_URL}/api/asistencias`).then(res => res.json()).then(setAsistencias);
-  const cargarGastos = () => fetch(`${API_BASE_URL}/api/gastos`).then(res => res.json()).then(setGastos);
+  const cargarObras = () => fetch(`${API_BASE_URL}/api/obras`).then(res => res.json()).then(setObras).catch(err => console.error("Error al cargar obras:", err));
+  const cargarTrabajadores = () => fetch(`${API_BASE_URL}/api/trabajadores`).then(res => res.json()).then(setTrabajadores).catch(err => console.error("Error al cargar trabajadores:", err));
+  const cargarAsistencias = () => fetch(`${API_BASE_URL}/api/asistencias`).then(res => res.json()).then(setAsistencias).catch(err => console.error("Error al cargar asistencias:", err));
+  const cargarGastos = () => fetch(`${API_BASE_URL}/api/gastos`).then(res => res.json()).then(setGastos).catch(err => console.error("Error al cargar gastos:", err));
 
   // ================= HELPERS Y CÁLCULOS FILTRADOS =================
   const getNombreObra = (id) => obras.find(o => Number(o.id) === Number(id))?.nombreObra || '';
