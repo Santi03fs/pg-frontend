@@ -1739,8 +1739,8 @@ function App() {
                         </label>
                       </td>
                       <td>
-  <button onClick={() => { setObraSeleccionadaPartidas(o); fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`).then(res => res.json()).then(setPartidasObra).catch(err => console.error("Error al cargar partidas:", err)); }} className="btn-excel" style={{ backgroundColor: '#e67e22', padding: '6px 12px', marginRight: '4px' }}>⚙️ Partidas</button>
-  <button onClick={() => { setObraSeleccionadaFases(o); fetch(`${API_BASE_URL}/api/fases/obra/${o.id}`).then(res => res.json()).then(setFasesObra).catch(err => console.error("Error al cargar fases:", err)); }} className="btn-excel" style={{ backgroundColor: '#f39c12', padding: '6px 12px' }}>⚙️ Fases</button>
+  <button onClick={() => { setObraSeleccionadaPartidas(o); fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`).then(res => res.json()).then(data => { if (data.length === 0) { setPartidasObra(Array.from({length: 30}, (_, i) => ({ id: null, idObra: o.id, numero: i+1, nombre: "Partida " + (i+1) }))); } else { setPartidasObra(data); } }).catch(err => console.error("Error al cargar partidas:", err)); }} className="btn-excel" style={{ backgroundColor: '#e67e22', padding: '6px 12px', marginRight: '4px' }}>⚙️ Partidas</button>
+  <button onClick={() => { setObraSeleccionadaFases(o); fetch(`${API_BASE_URL}/api/fases/obra/${o.id}`).then(res => res.json()).then(data => { if (data.length === 0) { setFasesObra(Array.from({length: 30}, (_, i) => ({ id: null, idObra: o.id, numero: i+1, nombre: "Fase " + (i+1) }))); } else { setFasesObra(data); } }).catch(err => console.error("Error al cargar fases:", err)); }} className="btn-excel" style={{ backgroundColor: '#f39c12', padding: '6px 12px' }}>⚙️ Fases</button>
 </td>
                       
                       {/* BOTONES ACCIÓN OBRA ACTUALIZADOS */}
@@ -1796,9 +1796,13 @@ function App() {
                   </div>
                   <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                     <button type="button" onClick={() => {
-                      setFasesObra(prev => prev.map((item, idx) => {
-                        return { ...item, nombre: `Fase ${item.numero || (idx + 1)}` };
+                      const nuevasFases = Array.from({length: 30}, (_, i) => ({ 
+                         id: (fasesObra[i] && fasesObra[i].id) ? fasesObra[i].id : null, 
+                         idObra: obraSeleccionadaFases.id, 
+                         numero: i+1, 
+                         nombre: `Fase ${i+1}` 
                       }));
+                      setFasesObra(nuevasFases);
                     }} className="btn-action" style={{ backgroundColor: '#8e44ad', padding: '10px 18px', fontSize: '14px', cursor: 'pointer' }}>
                       📋 Restaurar Nombres Genéricos
                     </button>
@@ -1841,7 +1845,7 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginTop: '20px' }}>
                   <button type="button" onClick={aplicarPlantillaPartidas} className="btn-action" style={{ backgroundColor: '#8e44ad', padding: '10px 18px', fontSize: '14px', cursor: 'pointer' }}>
-                    📋 Aplicar Plantilla de 15 Partidas
+                    📋 Restaurar Nombres Genéricos
                   </button>
                   <button type="button" onClick={handleSaveAllPartidas} className="btn-action" style={{ backgroundColor: '#2ecc71', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}>
                     💾 Guardar Todas las Partidas
