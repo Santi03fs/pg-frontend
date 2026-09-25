@@ -103,6 +103,8 @@ function App() {
 
   
   const [idObraSelGasto, setIdObraSelGasto] = useState('');
+  const [partidaGasto, setPartidaGasto] = useState('');
+  const [faseGasto, setFaseGasto] = useState('');
   const [categoria, setCategoria] = useState('');
   const [fechaGasto, setFechaGasto] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -930,8 +932,8 @@ function App() {
 
   const guardarGasto = (e) => { 
     e.preventDefault(); 
-    fetch(`${API_BASE_URL}/api/gastos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
-    .then(() => { setIdObraSelGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
+    fetch(`${API_BASE_URL}/api/gastos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, partida: partidaGasto, fase: faseGasto, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
+    .then(() => { setIdObraSelGasto(''); setPartidaGasto(''); setFaseGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
   };
 
   // ================= LA MAGIA DE EXPORTAR A EXCEL (ESTRUCTURA EXACTA DE PARTIDAS Y FASES) =================
