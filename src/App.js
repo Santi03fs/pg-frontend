@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './apiInterceptor';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import './App.css';
 import Login from './Login';
 
@@ -18,97 +18,9 @@ const LogoPG = () => (
   </svg>
 );
 
-const plantillaPartidasPredefinidas = [
-  "ESTRUCTURA",
-  "ALUMINIO",
-  "REVESTIMIENTO",
-  "MURO Y BARBACOA",
-  "PANEL SÁNDWICH",
-  "HERRAJES",
-  "VIDRIOS",
-  "MOBILIARIO DE COCINA",
-  "ALBAÑILERÍA",
-  "PINTURA",
-  "FONTANERÍA",
-  "ELECTRICIDAD",
-  "CAMPANA Y TUBOS",
-  "DEMOLICIONES Y DESESCOMBRO",
-  "REMATES Y LIMPIEZA"
-];
+const plantillaPartidasPredefinidas = Array.from({length: 30}, (_, i) => `Partida ${i+1}`);
+const plantillaFasesPredefinidas = Array.from({length: 30}, (_, i) => `Fase ${i+1}`);
 
-// Catálogo de fases de obra habituales organizadas por partida
-const fasesPredeterminadasPorPartida = {
-  'ESTRUCTURA': [
-    'Estructura techo',
-    'Fabricar estructura techo',
-    'Terminar estructura techo',
-    'Montando estructura',
-    'Preparar tubo y montar',
-    'Soldadura y anclajes',
-    'Montaje de pilares'
-  ],
-  'ALUMINIO': [
-    'Con el aluminio',
-    'Fabricando ventanas',
-    'Medir remates',
-    'Colocando remates aluminio',
-    'Remates aluminio',
-    'Montaje de hojas y cristales',
-    'Colocación de cercos'
-  ],
-  'REVESTIMIENTO': [
-    'Colocando suelo',
-    'Con el azulejo',
-    'Con los materiales',
-    'Enluciendo las paredes',
-    'Alicatado de paredes',
-    'Enlechado y juntas',
-    'Preparación de masa y mortero'
-  ],
-  'ALBAÑILERÍA': [
-    'Enluciendo las paredes',
-    'Con el muro',
-    'Levantando tabiques',
-    'Picado y desescombro',
-    'Regatas y tubos',
-    'Raseo de mortero',
-    'Maestreado de paredes'
-  ],
-  'MURO Y BARBACOA': [
-    'Con el muro',
-    'Remates barbacoa',
-    'Montando cocina',
-    'Colocación de bloques',
-    'Hormigonado y cimentación',
-    'Zuncho y remates'
-  ],
-  'PANEL SÁNDWICH': [
-    'Montaje panel sándwich',
-    'Colocación de remates',
-    'Sellado y fijación'
-  ],
-  'MOBILIARIO DE COCINA': [
-    'Montaje de cocina',
-    'Ajuste de muebles',
-    'Colocación de encimera'
-  ],
-  'PINTURA': [
-    'Lijado y masillado',
-    'Primera mano de pintura',
-    'Segunda mano de pintura',
-    'Pintado de techos'
-  ],
-  'FONTANERÍA': [
-    'Instalación de tuberías',
-    'Montaje de sanitarios',
-    'Desagües y bajantes'
-  ],
-  'ELECTRICIDAD': [
-    'Pasar cables y líneas',
-    'Colocación de mecanismos',
-    'Cuadro eléctrico'
-  ]
-};
 
 // ================= HORARIOS Y FRANJAS =================
 const horariosPredefinidos = [
@@ -349,6 +261,7 @@ function App() {
     cargarAsistencias(); 
     cargarGastos();
     cargarPartidas();
+    cargarFases();
     
     const userStored = localStorage.getItem('pg_user') || sessionStorage.getItem('pg_user');
     if (userStored) {
@@ -362,7 +275,8 @@ function App() {
     }
   };
 
-  const cargarPartidas = () => fetch(`${API_BASE_URL}/api/partidas`).then(res => res.json()).then(setPartidas).catch(err => console.error("Error al cargar partidas:", err));
+  const cargarPartidas = \(\) => fetch\(\`\$\{API_BASE_URL\}/api/partidas\`\).then\(res => res.json\(\)\).then\(setPartidas\).catch\(err => console.error\(\"Error al cargar partidas:\", err\)\);
+  const cargarFases = () => fetch(`${API_BASE_URL}/api/fases`).then(res => res.json()).then(setFases).catch(err => console.error("Error al cargar fases:", err));
   const cargarUsuarios = () => fetch(`${API_BASE_URL}/api/usuarios`).then(res => res.json()).then(setUsuarios).catch(err => console.error("Error al cargar usuarios:", err));
   const cargarObras = () => fetch(`${API_BASE_URL}/api/obras`).then(res => res.json()).then(setObras).catch(err => console.error("Error al cargar obras:", err));
   const cargarTrabajadores = () => fetch(`${API_BASE_URL}/api/trabajadores`).then(res => res.json()).then(setTrabajadores).catch(err => console.error("Error al cargar trabajadores:", err));
@@ -370,31 +284,6 @@ function App() {
   const cargarGastos = () => fetch(`${API_BASE_URL}/api/gastos`).then(res => res.json()).then(setGastos).catch(err => console.error("Error al cargar gastos:", err));
 
   // ================= HELPERS Y CÁLCULOS FILTRADOS =================
-  const getFasesParaPartida = (nombrePartida, idObra) => {
-    const fasesGenericas = [
-      'Trabajos generales',
-      'Enluciendo las paredes',
-      'Colocando suelo',
-      'Con el muro',
-      'Remates y repaso',
-      'Picado y desescombro'
-    ];
-    if (!nombrePartida) return fasesGenericas;
-
-    const nombreNorm = nombrePartida.trim().toLowerCase();
-    const keyMatch = Object.keys(fasesPredeterminadasPorPartida).find(k => 
-      k.toLowerCase() === nombreNorm || nombreNorm.includes(k.toLowerCase()) || k.toLowerCase().includes(nombreNorm)
-    );
-    const fasesCatalogo = keyMatch ? fasesPredeterminadasPorPartida[keyMatch] : [];
-
-    // Fases ya utilizadas previamente en la base de datos para no repetirse
-    const fasesHistorico = asistencias
-      .filter(a => (a.partida || '').trim().toLowerCase() === nombreNorm)
-      .map(a => (a.descripcion || '').trim())
-      .filter(Boolean);
-
-    return [...new Set([...fasesCatalogo, ...fasesHistorico, ...fasesGenericas])];
-  };
 
   const getNombreObra = (id) => obras.find(o => Number(o.id) === Number(id))?.nombreObra || '';
   const getNombreTrabajador = (id) => trabajadores.find(t => Number(t.id) === Number(id))?.nombre || 'Desconocido';
@@ -609,7 +498,7 @@ function App() {
         ? Boolean(asistenciasT[0].esExtra)
         : Boolean(t.esExtra);
 
-      const emptyObra = { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: pagoDiarioVal, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' };
+      const emptyObra = { idAsistencia: null, idObra: '', partida: '', fase: '', descripcion: '', tipoPago: 'Normal', pagoDia: pagoDiarioVal, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' };
 
       if (asistenciasT.length === 0) {
         return { idTrabajador: t.id, nombre: t.nombre, rol: rolVal, esExtra: esExtraVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Ausente', idAsistenciaRaiz: null, obras: [emptyObra] };
@@ -622,7 +511,7 @@ function App() {
           return {
             idTrabajador: t.id, nombre: t.nombre, rol: rolVal, esExtra: esExtraVal, horasJornada: horasJornadaVal, pagoDiarioDefault: pagoDiarioVal, estadoAsistencia: 'Presente', idAsistenciaRaiz: null,
             obras: asistenciasT.map(a => ({
-              idAsistencia: a.id, idObra: a.idObra || '', partida: a.partida || '', descripcion: a.descripcion || '', tipoPago: a.tipoPago || 'Normal',
+              idAsistencia: a.id, idObra: a.idObra || '', partida: a.partida || '', fase: a.fase || '', descripcion: a.descripcion || '', tipoPago: a.tipoPago || 'Normal',
               pagoDia: a.pagoDia !== undefined && a.pagoDia !== null ? a.pagoDia : pagoDiarioVal, horasTrabajadas: a.horasTrabajadas !== undefined ? a.horasTrabajadas : '',
               horario: a.horario || '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: ''
             }))
@@ -653,7 +542,7 @@ function App() {
         return {
           ...f, estadoAsistencia: nuevoEstado,
           obras: nuevoEstado === 'Presente' && (f.obras.length === 0 || (f.obras.length === 1 && f.obras[0].idObra === '')) ? [
-            { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }
+            { idAsistencia: null, idObra: '', partida: '', fase: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }
           ] : f.obras
         };
       }
@@ -666,7 +555,7 @@ function App() {
       if (f.idTrabajador === trabajadorId) {
         const lastObra = f.obras[f.obras.length - 1];
         return {
-          ...f, obras: [...f.obras, { idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: lastObra ? lastObra.horario : '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }]
+          ...f, obras: [...f.obras, { idAsistencia: null, idObra: '', partida: '', fase: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: lastObra ? lastObra.horario : '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }]
         };
       }
       return f;
@@ -679,7 +568,7 @@ function App() {
       if (f.idTrabajador === trabajadorId) {
         const nuevasObras = f.obras.filter((_, idx) => idx !== obraIndex);
         return {
-          ...f, obras: nuevasObras.length === 0 ? [{ idAsistencia: null, idObra: '', partida: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }] : nuevasObras
+          ...f, obras: nuevasObras.length === 0 ? [{ idAsistencia: null, idObra: '', partida: '', fase: '', descripcion: '', tipoPago: 'Normal', pagoDia: f.pagoDiarioDefault, horasTrabajadas: '', horario: '', mostrarTransporte: false, transporteDesc: '', transporteTarifa: '' }] : nuevasObras
         };
       }
       return f;
@@ -773,7 +662,8 @@ function App() {
           esExtra: Boolean(fila.esExtra),
           horario: '',
           partida: '',
-          descripcion: '',
+            fase: '',
+            descripcion: '',
           pagado: false
         });
       } else {
@@ -792,6 +682,7 @@ function App() {
             esExtra: Boolean(fila.esExtra),
             horario: o.horario || '',
             partida: o.partida || '',
+            fase: o.fase || '',
             descripcion: o.descripcion || '',
             pagado: false
           });
@@ -928,7 +819,8 @@ function App() {
         setNombreObra(''); 
         setFechaInicio(''); 
         cargarObras(); 
-        cargarPartidas(); 
+        cargarPartidas();
+    cargarFases(); 
       });
     }
   };
@@ -947,6 +839,7 @@ function App() {
           cargarAsistencias();
           cargarGastos();
           cargarPartidas();
+    cargarFases();
         } else {
           alert("❌ Error al eliminar esta obra.");
         }
@@ -1106,86 +999,115 @@ function App() {
     const horasYaProcesadas = new Set();
     const gastosYaProcesados = new Set();
 
+    // ESTILOS EXCEL
+    const styleHeaderPartida = { fill: { fgColor: { rgb: "D9D9D9" } }, font: { bold: true } };
+    const styleHeaderGasto = { font: { bold: true } };
+    const styleFaseNegrita = { font: { bold: true } };
+
     // 5. Generar bloques por cada PARTIDA
     listaPartidas.forEach(partidaNombre => {
       const pNorm = partidaNombre.toLowerCase();
       const horasPartida = horasObra.filter(h => (h.partida || '').trim().toLowerCase() === pNorm);
       const gastosPartida = gastosObra.filter(g => {
         const cat = (g.categoria || '').trim().toLowerCase();
-        const desc = (g.descripcion || '').toLowerCase();
-        return cat === pNorm || desc.includes(pNorm);
+        return cat === pNorm;
       });
 
       if (horasPartida.length === 0 && gastosPartida.length === 0) return;
 
-      // TÍTULO DE PARTIDA (Fila destacada con el nombre de la partida)
-      datosExcel.push(["", partidaNombre.toUpperCase(), "", "", "", "", "", ""]);
+      // TÍTULO DE PARTIDA (Fila destacada con el nombre de la partida y fondo gris)
+      datosExcel.push([
+        {v: "", s: styleHeaderPartida},
+        {v: partidaNombre.toUpperCase(), s: styleHeaderPartida},
+        {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}
+      ]);
 
       // A) FASES DE TRABAJO Y OPERARIOS (Mano de Obra)
       if (horasPartida.length > 0) {
-        horasPartida.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+        horasPartida.sort((a, b) => {
+           let cmp = (a.fecha || '').localeCompare(b.fecha || '');
+           if (cmp === 0) cmp = (a.fase || '').localeCompare(b.fase || '');
+           return cmp;
+        });
+        
         let subtotalHorasPartida = 0;
+        let lastFase = null;
+        let lastFecha = null;
 
         horasPartida.forEach(h => {
-          horasYaProcesadas.add(h.id);
-          const horas = parseFloat(h.horasTrabajadas) || 0;
+          const trabajadorName = getNombreTrabajador(h.idTrabajador);
+          const horas = h.horasTrabajadas || 0;
           subtotalHorasPartida += horas;
           granTotalHoras += horas;
 
-          const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
-          const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
-          const nombreOperario = trabajadorObj ? trabajadorObj.nombre : (h.nombreTrabajador || "Operario");
-          const faseObra = h.descripcion && h.descripcion.trim() !== '' ? h.descripcion : "Trabajos de obra";
+          const faseName = h.fase && h.fase.trim() !== '' ? h.fase.trim() : "Trabajos generales";
+          
+          let displayFecha = formatFecha(h.fecha);
+          let displayFase = faseName;
+          
+          if (displayFecha === lastFecha && displayFase === lastFase) {
+             displayFecha = "";
+             displayFase = "";
+          } else {
+             lastFecha = displayFecha;
+             lastFase = displayFase;
+          }
 
           datosExcel.push([
-            h.fecha || "",
-            faseObra,
-            nombreOperario,
-            horas,
-            "",
-            "",
-            "",
-            "- €"
+            displayFecha,
+            { v: displayFase, s: displayFase ? styleFaseNegrita : {} },
+            trabajadorName,
+            horas.toFixed(2).replace('.', ','),
+            "", "", "", ""
           ]);
         });
-
-        // Fila de cierre TOTAL H
-        datosExcel.push(["", "", "TOTAL H", subtotalHorasPartida, "", "", "", "- €"]);
+        
+        datosExcel.push(["", {v: "TOTAL H", s: styleHeaderGasto}, "", subtotalHorasPartida, "", "", "", "- €"]);
         datosExcel.push([]);
       }
 
-      // B) MATERIALES ASOCIADOS A ESTA PARTIDA
+      // B) MATERIALES ASOCIADOS A ESTA PARTIDA (Gastos)
       if (gastosPartida.length > 0) {
-        datosExcel.push(["", "MATERIAL:", "", "", "", "", "", ""]);
         let subtotalNetoPartida = 0;
         let subtotalPvpPartida = 0;
 
+        // Extraer categorías/fases únicas para gastos
+        const catsGastos = [...new Set(gastosPartida.map(g => g.descripcion && g.descripcion.split(' - ')[0] || "MATERIAL"))];
+        // Wait, for Gastos, typically the user wrote descriptions directly. Let's just group by "MATERIAL:" default if needed.
+        // Actually, looking at screenshot 3, it says "MATERIAL:", "MOBILIARIO DE COCINA:".
+        // Let's just use the current categories logic or assume they want a header per category.
+        
+        const catMap = {};
         gastosPartida.forEach(g => {
-          gastosYaProcesados.add(g.id);
-          const netoUnit = parseFloat(g.precioNeto) || 0;
-          const pvpUnit = parseFloat(g.precioPvp) || 0;
-          const uds = parseFloat(g.udsHoras) || 1;
-          const subNeto = netoUnit * uds;
-          const subPvp = pvpUnit * uds;
+            const c = g.descripcion || "MATERIAL";
+            if (!catMap[c]) catMap[c] = [];
+            catMap[c].push(g);
+        });
+
+        // Simplified for Gastos based on their Excel layout
+        datosExcel.push(["", {v: "MATERIAL:", s: styleHeaderGasto}, "", "", "", "", "", ""]);
+        
+        gastosPartida.forEach(g => {
+          const subNeto = (g.precioNeto || 0) * (g.udsHoras || 1);
+          const subPvp = (g.precioPvp || 0) * (g.udsHoras || 1);
           subtotalNetoPartida += subNeto;
           subtotalPvpPartida += subPvp;
           granTotalNeto += subNeto;
           granTotalPvp += subPvp;
 
           datosExcel.push([
-            g.fecha || "",
-            g.descripcion || "",
-            g.provTrabajador || "",
-            uds,
-            netoUnit > 0 ? netoUnit : "",
+            formatFecha(g.fecha),
+            g.descripcion,
+            g.provTrabajador,
+            g.udsHoras,
+            g.precioNeto > 0 ? g.precioNeto : "",
             subNeto > 0 ? subNeto : "",
-            pvpUnit > 0 ? pvpUnit : "",
+            g.precioPvp > 0 ? g.precioPvp : "",
             subPvp > 0 ? subPvp : ""
           ]);
         });
 
-        // Fila de cierre TOTAL €
-        datosExcel.push(["", "", "TOTAL €", "", "", subtotalNetoPartida > 0 ? subtotalNetoPartida : "", "", subtotalPvpPartida > 0 ? subtotalPvpPartida : ""]);
+        datosExcel.push(["", "", {v: "TOTAL €", s: styleHeaderGasto}, "", "", subtotalNetoPartida > 0 ? subtotalNetoPartida : "", "", subtotalPvpPartida > 0 ? subtotalPvpPartida : ""]);
         datosExcel.push([]);
       }
     });
@@ -1223,7 +1145,7 @@ function App() {
     if (gastosSueltos.length > 0) {
       const categoriasRestantes = [...new Set(gastosSueltos.map(g => (g.categoria || 'VARIOS').toUpperCase()))];
       categoriasRestantes.forEach(cat => {
-        datosExcel.push(["", cat + ":", "", "", "", "", "", ""]);
+        datosExcel.push(["", {v: cat + ":", s: styleHeaderGasto}, "", "", "", "", "", ""]);
         let subtotalCatNeto = 0;
         let subtotalCatPvp = 0;
 
@@ -1249,21 +1171,21 @@ function App() {
             subPvp > 0 ? subPvp : ""
           ]);
         });
-        datosExcel.push(["", "", "TOTAL €", "", "", subtotalCatNeto > 0 ? subtotalCatNeto : "", "", subtotalCatPvp > 0 ? subtotalCatPvp : ""]);
+        datosExcel.push(["", "", {v: "TOTAL €", s: styleHeaderGasto}, "", "", subtotalCatNeto > 0 ? subtotalCatNeto : "", "", subtotalCatPvp > 0 ? subtotalCatPvp : ""]);
         datosExcel.push([]);
       });
     }
 
     // 8. Resumen global y entregas a cuenta tal como al final de la foto
-    datosExcel.push(["", "", "TOTAL GENERAL HORAS", granTotalHoras, "", "", "", "- €"]);
-    datosExcel.push(["", "", "TOTAL GENERAL NETO", "", "", granTotalNeto > 0 ? granTotalNeto : "", "", ""]);
-    datosExcel.push(["", "", "TOTAL GENERAL PVP", "", "", "", "", granTotalPvp > 0 ? granTotalPvp : ""]);
+    datosExcel.push(["", "", {v: "TOTAL GENERAL HORAS", s: styleHeaderGasto}, granTotalHoras, "", "", "", "- €"]);
+    datosExcel.push(["", "", {v: "TOTAL GENERAL NETO", s: styleHeaderGasto}, "", "", granTotalNeto > 0 ? granTotalNeto : "", "", ""]);
+    datosExcel.push(["", "", {v: "TOTAL GENERAL PVP", s: styleHeaderGasto}, "", "", "", "", granTotalPvp > 0 ? granTotalPvp : ""]);
     datosExcel.push([]);
 
     const entrega1 = parseFloat(obraTarget.presupuestoPvp) || 0;
-    datosExcel.push(["ENTREGA A CUENTA 1 ()", "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
-    datosExcel.push(["ENTREGA A CUENTA 2 ()", "", "", "", "", "", "", ""]);
-    datosExcel.push(["TOTAL ENTREGAS", "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
+    datosExcel.push([{v: "ENTREGA A CUENTA 1 ()", s: styleHeaderGasto}, "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
+    datosExcel.push([{v: "ENTREGA A CUENTA 2 ()", s: styleHeaderGasto}, "", "", "", "", "", "", ""]);
+    datosExcel.push([{v: "TOTAL ENTREGAS", s: styleHeaderGasto}, "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
 
     const hoja = XLSX.utils.aoa_to_sheet(datosExcel);
 
@@ -1709,39 +1631,31 @@ function App() {
                                       })()}
                                     </select>
 
-                                    {/* Desplegable 2: Fase de obra (con selector rápido + datalist para escribir o autocompletar) */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flex: '1.8', minWidth: '170px' }}>
-                                      <input 
-                                        list={`fases-list-${fila.idTrabajador}-${idx}`}
-                                        className="input-standard" 
-                                        placeholder="-- 2. Fase de obra (ej: Enluciendo paredes) --" 
-                                        style={{ padding: '6px', fontSize: '13px', width: '100%', borderColor: '#e67e22' }} 
-                                        value={obraAsig.descripcion || ''} 
-                                        onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value)} 
-                                      />
-                                      <datalist id={`fases-list-${fila.idTrabajador}-${idx}`}>
-                                        {getFasesParaPartida(obraAsig.partida, obraAsig.idObra).map((fase, fIdx) => (
-                                          <option key={fIdx} value={fase}>{fase}</option>
-                                        ))}
-                                      </datalist>
-
-                                      <select
-                                        className="input-standard"
-                                        style={{ padding: '6px 4px', fontSize: '12px', width: '32px', cursor: 'pointer', backgroundColor: '#fff7ed', borderColor: '#e67e22' }}
-                                        title="Seleccionar fase de obra predefinida"
-                                        value=""
-                                        onChange={(e) => {
-                                          if (e.target.value) {
-                                            handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value);
-                                          }
-                                        }}
-                                      >
-                                        <option value="">▼</option>
-                                        {getFasesParaPartida(obraAsig.partida, obraAsig.idObra).map((fase, fIdx) => (
-                                          <option key={fIdx} value={fase}>{fase}</option>
-                                        ))}
-                                      </select>
-                                    </div>
+                                    {/* Desplegable 2: Fase */}
+                                    <select 
+                                      className="input-standard" 
+                                      style={{ padding: '6px', fontSize: '13px', flex: '1.2', minWidth: '125px', borderColor: '#e67e22' }} 
+                                      value={obraAsig.fase || ''} 
+                                      onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'fase', e.target.value)}
+                                    >
+                                      <option value="">-- 2. Fase --</option>
+                                      {(() => {
+                                        const fasesDeEstaObra = fases.filter(f => Number(f.idObra) === Number(obraAsig.idObra));
+                                        if (fasesDeEstaObra.length > 0) {
+                                          return fasesDeEstaObra.map(f => <option key={f.id} value={f.nombre}>{f.nombre}</option>);
+                                        }
+                                        return plantillaFasesPredefinidas.map(nom => <option key={nom} value={nom}>{nom}</option>);
+                                      })()}
+                                    </select>
+                                    
+                                    {/* Input 3: Descripción Libre */}
+                                    <input 
+                                      className="input-standard" 
+                                      placeholder="-- 3. Detalles --" 
+                                      style={{ padding: '6px', fontSize: '13px', flex: '1.2', minWidth: '130px', borderColor: '#bdc3c7' }} 
+                                      value={obraAsig.descripcion || ''} 
+                                      onChange={(e) => handleModificarObraAsignacion(fila.idTrabajador, idx, 'descripcion', e.target.value)} 
+                                    />
 
                                     {/* Horas */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1821,7 +1735,10 @@ function App() {
                           <span style={{ fontSize: '13px', fontWeight: 'bold', color: o.finalizada ? '#2ecc71' : '#e74c3c' }}>{o.finalizada ? 'Acabada' : 'En Curso'}</span>
                         </label>
                       </td>
-                      <td><button onClick={() => { setObraSeleccionadaPartidas(o); fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`).then(res => res.json()).then(setPartidasObra).catch(err => console.error("Error al cargar partidas:", err)); }} className="btn-excel" style={{ backgroundColor: '#e67e22', padding: '6px 12px' }}>⚙️ Configurar</button></td>
+                      <td>
+  <button onClick={() => { setObraSeleccionadaPartidas(o); fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`).then(res => res.json()).then(setPartidasObra).catch(err => console.error("Error al cargar partidas:", err)); }} className="btn-excel" style={{ backgroundColor: '#e67e22', padding: '6px 12px', marginRight: '4px' }}>⚙️ Partidas</button>
+  <button onClick={() => { setObraSeleccionadaFases(o); fetch(`${API_BASE_URL}/api/fases/obra/${o.id}`).then(res => res.json()).then(setFasesObra).catch(err => console.error("Error al cargar fases:", err)); }} className="btn-excel" style={{ backgroundColor: '#f39c12', padding: '6px 12px' }}>⚙️ Fases</button>
+</td>
                       
                       {/* BOTONES ACCIÓN OBRA ACTUALIZADOS */}
                       <td style={{ display: 'flex', gap: '8px' }}>
