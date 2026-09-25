@@ -275,7 +275,7 @@ function App() {
     }
   };
 
-  const cargarPartidas = \(\) => fetch\(\`\$\{API_BASE_URL\}/api/partidas\`\).then\(res => res.json\(\)\).then\(setPartidas\).catch\(err => console.error\(\"Error al cargar partidas:\", err\)\);
+  const cargarPartidas = () => fetch(`${API_BASE_URL}/api/partidas`).then(res => res.json()).then(setPartidas).catch(err => console.error("Error al cargar partidas:", err));
   const cargarFases = () => fetch(`${API_BASE_URL}/api/fases`).then(res => res.json()).then(setFases).catch(err => console.error("Error al cargar fases:", err));
   const cargarUsuarios = () => fetch(`${API_BASE_URL}/api/usuarios`).then(res => res.json()).then(setUsuarios).catch(err => console.error("Error al cargar usuarios:", err));
   const cargarObras = () => fetch(`${API_BASE_URL}/api/obras`).then(res => res.json()).then(setObras).catch(err => console.error("Error al cargar obras:", err));
