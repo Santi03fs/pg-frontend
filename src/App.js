@@ -1978,6 +1978,18 @@ function App() {
               <select className="input-standard" value={idObraSelGasto} onChange={e=>setIdObraSelGasto(e.target.value)} required>
                 <option value="">-- Seleccionar Obra --</option>{obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra} ({o.cliente})</option>)}
               </select>
+                <select className="input-standard" value={partidaGasto} onChange={(e) => setPartidaGasto(e.target.value)}>
+                  <option value="">-- Partida (Opcional) --</option>
+                  {idObraSelGasto && (partidas.filter(p => Number(p.idObra) === Number(idObraSelGasto)).length > 0 
+                     ? partidas.filter(p => Number(p.idObra) === Number(idObraSelGasto)).map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>) 
+                     : Array.from({length: 30}, (_, i) => `Partida ${i+1}`).map(nom => <option key={nom} value={nom}>{nom}</option>))}
+                </select>
+                <select className="input-standard" value={faseGasto} onChange={(e) => setFaseGasto(e.target.value)}>
+                  <option value="">-- Fase (Opcional) --</option>
+                  {idObraSelGasto && (fases.filter(f => Number(f.idObra) === Number(idObraSelGasto)).length > 0 
+                     ? fases.filter(f => Number(f.idObra) === Number(idObraSelGasto)).map(f => <option key={f.id} value={f.nombre}>{f.nombre}</option>) 
+                     : Array.from({length: 30}, (_, i) => `Fase ${i+1}`).map(nom => <option key={nom} value={nom}>{nom}</option>))}
+                </select>
               <select className="input-standard" value={categoria} onChange={e=>setCategoria(e.target.value)} required>
                 <option value="">-- Categoría --</option>
                 <option value="Materiales">Materiales</option>
