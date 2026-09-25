@@ -69,8 +69,11 @@ function App() {
 
   // ================= ESTADOS PARTIDAS =================
   const [partidas, setPartidas] = useState([]);
+  const [fases, setFases] = useState([]);
   const [obraSeleccionadaPartidas, setObraSeleccionadaPartidas] = useState(null);
+  const [obraSeleccionadaFases, setObraSeleccionadaFases] = useState(null);
   const [partidasObra, setPartidasObra] = useState([]);
+  const [fasesObra, setFasesObra] = useState([]);
 
   // Estados para Edición de Trabajador
   const [idTrabajadorEdit, setIdTrabajadorEdit] = useState(null);
@@ -1042,7 +1045,7 @@ function App() {
 
           const faseName = h.fase && h.fase.trim() !== '' ? h.fase.trim() : "Trabajos generales";
           
-          let displayFecha = formatFecha(h.fecha);
+          let displayFecha = h.fecha || '';
           let displayFase = faseName;
           
           if (displayFecha === lastFecha && displayFase === lastFase) {
@@ -1072,7 +1075,7 @@ function App() {
         let subtotalPvpPartida = 0;
 
         // Extraer categorías/fases únicas para gastos
-        const catsGastos = [...new Set(gastosPartida.map(g => g.descripcion && g.descripcion.split(' - ')[0] || "MATERIAL"))];
+        
         // Wait, for Gastos, typically the user wrote descriptions directly. Let's just group by "MATERIAL:" default if needed.
         // Actually, looking at screenshot 3, it says "MATERIAL:", "MOBILIARIO DE COCINA:".
         // Let's just use the current categories logic or assume they want a header per category.
@@ -1096,7 +1099,7 @@ function App() {
           granTotalPvp += subPvp;
 
           datosExcel.push([
-            formatFecha(g.fecha),
+            g.fecha || '',
             g.descripcion,
             g.provTrabajador,
             g.udsHoras,
@@ -1759,7 +1762,60 @@ function App() {
               </table>
             </div>
 
-            {/* MODAL CONFIGURADOR DE PARTIDAS */}
+            
+            {/* MODAL CONFIGURADOR DE FASES */}
+            {obraSeleccionadaFases && (
+              <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+                <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '80%', maxWidth: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, color: '#f39c12' }}>⚙️ Configurar las 30 Fases - {obraSeleccionadaFases.nombreObra}</h3>
+                    <button onClick={() => setObraSeleccionadaFases(null)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>✕ Cerrar</button>
+                  </div>
+                  <div style={{ overflowY: 'auto', paddingRight: '10px', flex: 1 }}>
+                    {fasesObra.map((f) => (
+                      <div key={f.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
+                        <span style={{ minWidth: '70px', fontWeight: 'bold', color: '#7f8c8d' }}>Fase {f.numero}:</span>
+                        <input
+                          type="text"
+                          className="input-standard"
+                          style={{ flex: 1, padding: '8px' }}
+                          value={f.nombre}
+                          onChange={(e) => {
+                            const nuevoNombre = e.target.value;
+                            setFasesObra(prev => prev.map(item => item.id === f.id ? { ...item, nombre: nuevoNombre } : item));
+                          }}
+                        />
+                        <button onClick={async () => {
+                          try {
+                            const res = await fetch(`${API_BASE_URL}/api/fases/${f.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: f.nombre }) });
+                            if (res.ok) { cargarFases(); cargarAsistencias(); alert("Fase guardada"); }
+                          } catch (e) { console.error("Error", e); }
+                        }} style={{ background: '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px' }}>💾</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <button type="button" onClick={() => {
+                      setFasesObra(prev => prev.map((item, idx) => {
+                        return { ...item, nombre: `Fase ${item.numero || (idx + 1)}` };
+                      }));
+                    }} className="btn-action" style={{ backgroundColor: '#8e44ad', padding: '10px 18px', fontSize: '14px', cursor: 'pointer' }}>
+                      📋 Restaurar Nombres Genéricos
+                    </button>
+                    <button type="button" onClick={async () => {
+                      try {
+                        for (const f of fasesObra) await fetch(`${API_BASE_URL}/api/fases/${f.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: f.nombre }) });
+                        alert("¡Todas las fases se han guardado con éxito!"); cargarFases(); cargarAsistencias();
+                      } catch (e) { alert("Error al guardar algunas fases."); }
+                    }} className="btn-action" style={{ backgroundColor: '#2ecc71', padding: '10px 20px', fontSize: '14px', cursor: 'pointer' }}>
+                      💾 Guardar Todas las Fases
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+      {/* MODAL CONFIGURADOR DE PARTIDAS */}
             {obraSeleccionadaPartidas && (
               <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#fff', border: '2px solid #e67e22', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
