@@ -1051,7 +1051,7 @@ function App() {
           
           let faseName = faseOriginal;
           if (descOriginal) {
-              faseName = faseOriginal !== "Trabajos generales" ? ${faseOriginal} -  : descOriginal;
+              faseName = faseOriginal !== "Trabajos generales" ? `${faseOriginal} - ${descOriginal}` : descOriginal;
           }
           
           let displayFecha = h.fecha || '';
