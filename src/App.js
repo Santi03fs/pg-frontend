@@ -1745,6 +1745,7 @@ function App() {
                       <td>
   <button onClick={() => { setObraSeleccionadaPartidas(o); fetch(`${API_BASE_URL}/api/partidas/obra/${o.id}`).then(res => res.json()).then(data => { if (data.length === 0) { setPartidasObra(Array.from({length: 30}, (_, i) => ({ id: null, idObra: o.id, numero: i+1, nombre: "Partida " + (i+1) }))); } else { setPartidasObra(data); } }).catch(err => console.error("Error al cargar partidas:", err)); }} className="btn-excel" style={{ backgroundColor: '#e67e22', padding: '6px 12px', marginRight: '4px' }}>⚙️ Partidas</button>
   <button onClick={() => { setObraSeleccionadaFases(o); fetch(`${API_BASE_URL}/api/fases/obra/${o.id}`).then(res => res.json()).then(data => { if (data.length === 0) { setFasesObra(Array.from({length: 30}, (_, i) => ({ id: null, idObra: o.id, numero: i+1, nombre: "Fase " + (i+1) }))); } else { setFasesObra(data); } }).catch(err => console.error("Error al cargar fases:", err)); }} className="btn-excel" style={{ backgroundColor: '#f39c12', padding: '6px 12px' }}>⚙️ Fases</button>
+                          <button onClick={() => { setObraSeleccionadaEntregas(o); fetch(`${API_BASE_URL}/api/entregas/obra/${o.id}`).then(res => res.json()).then(setEntregasObra).catch(err => console.error("Error al cargar entregas:", err)); }} className="btn-excel" style={{ backgroundColor: '#16a085', padding: '6px 12px', marginLeft: '4px' }}>💰 Entregas</button>
 </td>
                       
                       {/* BOTONES ACCIÓN OBRA ACTUALIZADOS */}
