@@ -1040,8 +1040,9 @@ function App() {
         let lastFecha = null;
 
         horasPartida.forEach(h => {
+          horasYaProcesadas.add(h.id);
           const trabajadorName = getNombreTrabajador(h.idTrabajador);
-          const horas = h.horasTrabajadas || 0;
+          const horas = (parseFloat(h.horasTrabajadas) || 0) + (parseFloat(h.horasExtra) || 0);
           subtotalHorasPartida += horas;
           granTotalHoras += horas;
 
@@ -1093,6 +1094,7 @@ function App() {
         datosExcel.push(["", {v: "MATERIAL:", s: styleHeaderGasto}, "", "", "", "", "", ""]);
         
         gastosPartida.forEach(g => {
+          gastosYaProcesados.add(g.id);
           const subNeto = (g.precioNeto || 0) * (g.udsHoras || 1);
           const subPvp = (g.precioPvp || 0) * (g.udsHoras || 1);
           subtotalNetoPartida += subNeto;
@@ -1116,34 +1118,6 @@ function App() {
         datosExcel.push([]);
       }
     });
-
-    // 6. Horas sin partida asignada si las hubiese
-    const horasSueltas = horasObra.filter(h => !horasYaProcesadas.has(h.id));
-    if (horasSueltas.length > 0) {
-      datosExcel.push(["", "TRABAJOS GENERALES", "", "", "", "", "", ""]);
-      let subHorasSueltas = 0;
-      horasSueltas.forEach(h => {
-        const horas = parseFloat(h.horasTrabajadas) || 0;
-        subHorasSueltas += horas;
-        granTotalHoras += horas;
-        const idT = h.idTrabajador !== undefined ? h.idTrabajador : (h.trabajador && h.trabajador.id);
-        const trabajadorObj = trabajadores.find(t => Number(t.id) === Number(idT));
-        const nombreOperario = trabajadorObj ? trabajadorObj.nombre : (h.nombreTrabajador || "Operario");
-
-        datosExcel.push([
-          h.fecha || "",
-          h.descripcion || "Mano de obra general",
-          nombreOperario,
-          horas,
-          "",
-          "",
-          "",
-          "- €"
-        ]);
-      });
-      datosExcel.push(["", "", "TOTAL H", subHorasSueltas, "", "", "", "- €"]);
-      datosExcel.push([]);
-    }
 
     // 7. Materiales / Gastos restantes por categoría (Herrajes, Vidrios, etc.)
     const gastosSueltos = gastosObra.filter(g => !gastosYaProcesados.has(g.id));
