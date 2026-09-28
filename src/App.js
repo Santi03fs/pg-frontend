@@ -1046,7 +1046,13 @@ function App() {
           subtotalHorasPartida += horas;
           granTotalHoras += horas;
 
-          const faseName = h.fase && h.fase.trim() !== '' ? h.fase.trim() : "Trabajos generales";
+          const faseOriginal = h.fase && h.fase.trim() !== '' ? h.fase.trim() : "Trabajos generales";
+          const descOriginal = h.descripcion && h.descripcion.trim() !== '' ? h.descripcion.trim() : "";
+          
+          let faseName = faseOriginal;
+          if (descOriginal) {
+              faseName = faseOriginal !== "Trabajos generales" ? ${faseOriginal} -  : descOriginal;
+          }
           
           let displayFecha = h.fecha || '';
           let displayFase = faseName;
