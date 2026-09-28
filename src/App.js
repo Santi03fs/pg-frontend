@@ -1038,6 +1038,7 @@ function App() {
           {v: partidaNombre.toUpperCase(), s: styleHeaderPartida},
           {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}
         ]);
+        datosExcel.push([]); // Espacio debajo del título de la Partida
   
         // Agrupar todo por Fase
         const fasesSet = new Set();
@@ -1045,7 +1046,6 @@ function App() {
         gastosPartida.forEach(g => fasesSet.add((g.fase || "").trim() !== '' ? g.fase.trim() : "Trabajos generales"));
   
         const fases = Array.from(fasesSet).sort();
-        // Mover "Trabajos generales" al principio
         if (fases.includes("Trabajos generales")) {
             fases.splice(fases.indexOf("Trabajos generales"), 1);
             fases.unshift("Trabajos generales");
@@ -1079,8 +1079,12 @@ function App() {
                 
                 let displayFecha = h.fecha || '';
                 let displayDesc = descOriginal || faseName;
+                let textStyle = styleFaseNormal; // Normal text for descriptions
+
                 if (faseName !== "Trabajos generales" && descOriginal && !descOriginal.includes(faseName)) {
                     displayDesc = `${faseName} - ${descOriginal}`;
+                } else if (faseName !== "Trabajos generales" && !descOriginal) {
+                    textStyle = styleFaseNegrita; // Solo el nombre de la fase va en negrita
                 }
                 
                 if (displayFecha === lastFecha) {
@@ -1091,23 +1095,34 @@ function App() {
       
                 datosExcel.push([
                   displayFecha,
-                  { v: displayDesc, s: styleFaseNegrita },
+                  { v: displayDesc, s: textStyle },
                   trabajadorName,
                   horas.toFixed(2).replace('.', ','),
                   "", "", "", ""
                 ]);
               });
               
-              datosExcel.push(["", {v: "TOTAL H", s: styleHeaderGasto}, "", subtotalHorasFase, "", "", "", "- €"]);
+              // TOTAL HORAS
+              datosExcel.push([
+                "", {v: "Total Horas:", s: styleTotalHoras}, "", 
+                {v: subtotalHorasFase, s: styleTotalHoras}, 
+                "", "", "", "- €"
+              ]);
             }
   
             // --- MATERIALES DE LA FASE ---
             if (gastosFase.length > 0) {
-              let subtotalNetoFase = 0;
-              let subtotalPvpFase = 0;
-      
-              const tituloMaterial = faseName === "Trabajos generales" ? "MATERIAL:" : `MATERIAL (${faseName}):`;
-              datosExcel.push(["", {v: tituloMaterial, s: styleHeaderGasto}, "", "", "", "", "", ""]);
+              // Si había horas, añadimos un espacio extra antes de MATERIAL para separar visualmente
+              if (horasFase.length > 0) {
+                datosExcel.push([]);
+              }
+
+              const tituloMaterial = faseName === "Trabajos generales" ? "MATERIALES Y GASTOS" : `MATERIALES (${faseName})`;
+              datosExcel.push([
+                "", 
+                {v: tituloMaterial, s: styleHeaderMaterial}, 
+                {v: "", s: styleHeaderMaterial}, {v: "", s: styleHeaderMaterial}, {v: "", s: styleHeaderMaterial}, {v: "", s: styleHeaderMaterial}, {v: "", s: styleHeaderMaterial}, {v: "", s: styleHeaderMaterial}
+              ]);
               
               gastosFase.forEach(g => {
                 gastosYaProcesados.add(g.id);
@@ -1119,10 +1134,9 @@ function App() {
                 granTotalPvp += subPvp;
       
                 let materialDesc = g.descripcion || faseName;
-                // Si el gasto solo tiene descripcion, usamos eso
                 datosExcel.push([
                   g.fecha || '',
-                  materialDesc,
+                  {v: materialDesc, s: styleFaseNormal},
                   g.provTrabajador || '',
                   g.udsHoras,
                   g.precioNeto > 0 ? g.precioNeto : "",
@@ -1132,7 +1146,15 @@ function App() {
                 ]);
               });
       
-              datosExcel.push(["", "", {v: "TOTAL €", s: styleHeaderGasto}, "", "", subtotalNetoFase > 0 ? subtotalNetoFase : "", "", subtotalPvpFase > 0 ? subtotalPvpFase : ""]);
+              // TOTAL MATERIAL
+              datosExcel.push([
+                "", "", 
+                {v: "Total Material:", s: styleTotalMaterial}, 
+                "", "", 
+                {v: subtotalNetoFase > 0 ? subtotalNetoFase : "", s: styleTotalMaterial}, 
+                "", 
+                {v: subtotalPvpFase > 0 ? subtotalPvpFase : "", s: styleTotalMaterial}
+              ]);
             }
             
             datosExcel.push([]); // blank row after each Fase block
