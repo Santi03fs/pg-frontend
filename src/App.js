@@ -1116,6 +1116,8 @@ function App() {
   
             // --- MATERIALES DE LA FASE ---
             if (gastosFase.length > 0) {
+              let subtotalNetoFase = 0;
+              let subtotalPvpFase = 0;
               // Si había horas, añadimos un espacio extra antes de MATERIAL para separar visualmente
               if (horasFase.length > 0) {
                 datosExcel.push([]);
