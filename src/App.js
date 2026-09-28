@@ -1025,122 +1025,121 @@ function App() {
     const styleFaseNegrita = { font: { bold: true } };
 
     // 5. Generar bloques por cada PARTIDA
-    listaPartidas.forEach(partidaNombre => {
-      const pNorm = partidaNombre.toLowerCase();
-      const horasPartida = horasObra.filter(h => (h.partida || '').trim().toLowerCase() === pNorm);
-      const gastosPartida = gastosObra.filter(g => {
-        const cat = (g.categoria || '').trim().toLowerCase();
-        return cat === pNorm;
+      listaPartidas.forEach(partidaNombre => {
+        const pNorm = partidaNombre.toLowerCase();
+        const horasPartida = horasObra.filter(h => (h.partida || '').trim().toLowerCase() === pNorm);
+        const gastosPartida = gastosObra.filter(g => (g.partida || '').trim().toLowerCase() === pNorm);
+  
+        if (horasPartida.length === 0 && gastosPartida.length === 0) return;
+  
+        // TÍTULO DE PARTIDA (Fila destacada con el nombre de la partida y fondo gris)
+        datosExcel.push([
+          {v: "", s: styleHeaderPartida},
+          {v: partidaNombre.toUpperCase(), s: styleHeaderPartida},
+          {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}
+        ]);
+  
+        // Agrupar todo por Fase
+        const fasesSet = new Set();
+        horasPartida.forEach(h => fasesSet.add((h.fase || "").trim() !== '' ? h.fase.trim() : "Trabajos generales"));
+        gastosPartida.forEach(g => fasesSet.add((g.fase || "").trim() !== '' ? g.fase.trim() : "Trabajos generales"));
+  
+        const fases = Array.from(fasesSet).sort();
+        // Mover "Trabajos generales" al principio
+        if (fases.includes("Trabajos generales")) {
+            fases.splice(fases.indexOf("Trabajos generales"), 1);
+            fases.unshift("Trabajos generales");
+        }
+  
+        fases.forEach((faseName) => {
+            const horasFase = horasPartida.filter(h => ((h.fase || "").trim() !== '' ? h.fase.trim() : "Trabajos generales") === faseName);
+            const gastosFase = gastosPartida.filter(g => ((g.fase || "").trim() !== '' ? g.fase.trim() : "Trabajos generales") === faseName);
+            
+            if (horasFase.length === 0 && gastosFase.length === 0) return;
+  
+            // --- HORAS DE LA FASE ---
+            if (horasFase.length > 0) {
+              horasFase.sort((a, b) => {
+                 let cmp = (a.fecha || '').localeCompare(b.fecha || '');
+                 if (cmp === 0) cmp = (a.fase || '').localeCompare(b.fase || '');
+                 return cmp;
+              });
+              
+              let subtotalHorasFase = 0;
+              let lastFecha = null;
+      
+              horasFase.forEach(h => {
+                horasYaProcesadas.add(h.id);
+                const trabajadorName = getNombreTrabajador(h.idTrabajador);
+                const horas = (parseFloat(h.horasTrabajadas) || 0) + (parseFloat(h.horasExtra) || 0);
+                subtotalHorasFase += horas;
+                granTotalHoras += horas;
+      
+                const descOriginal = h.descripcion && h.descripcion.trim() !== '' ? h.descripcion.trim() : "";
+                
+                let displayFecha = h.fecha || '';
+                let displayDesc = descOriginal || faseName;
+                if (faseName !== "Trabajos generales" && descOriginal && !descOriginal.includes(faseName)) {
+                    displayDesc = `${faseName} - ${descOriginal}`;
+                }
+                
+                if (displayFecha === lastFecha) {
+                   displayFecha = "";
+                } else {
+                   lastFecha = displayFecha;
+                }
+      
+                datosExcel.push([
+                  displayFecha,
+                  { v: displayDesc, s: styleFaseNegrita },
+                  trabajadorName,
+                  horas.toFixed(2).replace('.', ','),
+                  "", "", "", ""
+                ]);
+              });
+              
+              datosExcel.push(["", {v: "TOTAL H", s: styleHeaderGasto}, "", subtotalHorasFase, "", "", "", "- €"]);
+            }
+  
+            // --- MATERIALES DE LA FASE ---
+            if (gastosFase.length > 0) {
+              let subtotalNetoFase = 0;
+              let subtotalPvpFase = 0;
+      
+              const tituloMaterial = faseName === "Trabajos generales" ? "MATERIAL:" : `MATERIAL (${faseName}):`;
+              datosExcel.push(["", {v: tituloMaterial, s: styleHeaderGasto}, "", "", "", "", "", ""]);
+              
+              gastosFase.forEach(g => {
+                gastosYaProcesados.add(g.id);
+                const subNeto = (g.precioNeto || 0) * (g.udsHoras || 1);
+                const subPvp = (g.precioPvp || 0) * (g.udsHoras || 1);
+                subtotalNetoFase += subNeto;
+                subtotalPvpFase += subPvp;
+                granTotalNeto += subNeto;
+                granTotalPvp += subPvp;
+      
+                let materialDesc = g.descripcion || faseName;
+                // Si el gasto solo tiene descripcion, usamos eso
+                datosExcel.push([
+                  g.fecha || '',
+                  materialDesc,
+                  g.provTrabajador || '',
+                  g.udsHoras,
+                  g.precioNeto > 0 ? g.precioNeto : "",
+                  subNeto > 0 ? subNeto : "",
+                  g.precioPvp > 0 ? g.precioPvp : "",
+                  subPvp > 0 ? subPvp : ""
+                ]);
+              });
+      
+              datosExcel.push(["", "", {v: "TOTAL €", s: styleHeaderGasto}, "", "", subtotalNetoFase > 0 ? subtotalNetoFase : "", "", subtotalPvpFase > 0 ? subtotalPvpFase : ""]);
+            }
+            
+            datosExcel.push([]); // blank row after each Fase block
+        });
       });
-
-      if (horasPartida.length === 0 && gastosPartida.length === 0) return;
-
-      // TÍTULO DE PARTIDA (Fila destacada con el nombre de la partida y fondo gris)
-      datosExcel.push([
-        {v: "", s: styleHeaderPartida},
-        {v: partidaNombre.toUpperCase(), s: styleHeaderPartida},
-        {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}, {v: "", s: styleHeaderPartida}
-      ]);
-
-      // A) FASES DE TRABAJO Y OPERARIOS (Mano de Obra)
-      if (horasPartida.length > 0) {
-        horasPartida.sort((a, b) => {
-           let cmp = (a.fecha || '').localeCompare(b.fecha || '');
-           if (cmp === 0) cmp = (a.fase || '').localeCompare(b.fase || '');
-           return cmp;
-        });
-        
-        let subtotalHorasPartida = 0;
-        let lastFase = null;
-        let lastFecha = null;
-
-        horasPartida.forEach(h => {
-          horasYaProcesadas.add(h.id);
-          const trabajadorName = getNombreTrabajador(h.idTrabajador);
-          const horas = (parseFloat(h.horasTrabajadas) || 0) + (parseFloat(h.horasExtra) || 0);
-          subtotalHorasPartida += horas;
-          granTotalHoras += horas;
-
-          const faseOriginal = h.fase && h.fase.trim() !== '' ? h.fase.trim() : "Trabajos generales";
-          const descOriginal = h.descripcion && h.descripcion.trim() !== '' ? h.descripcion.trim() : "";
-          
-          let faseName = faseOriginal;
-          if (descOriginal) {
-              faseName = faseOriginal !== "Trabajos generales" ? `${faseOriginal} - ${descOriginal}` : descOriginal;
-          }
-          
-          let displayFecha = h.fecha || '';
-          let displayFase = faseName;
-          
-          if (displayFecha === lastFecha && displayFase === lastFase) {
-             displayFecha = "";
-             displayFase = "";
-          } else {
-             lastFecha = displayFecha;
-             lastFase = displayFase;
-          }
-
-          datosExcel.push([
-            displayFecha,
-            { v: displayFase, s: displayFase ? styleFaseNegrita : {} },
-            trabajadorName,
-            horas.toFixed(2).replace('.', ','),
-            "", "", "", ""
-          ]);
-        });
-        
-        datosExcel.push(["", {v: "TOTAL H", s: styleHeaderGasto}, "", subtotalHorasPartida, "", "", "", "- €"]);
-        datosExcel.push([]);
-      }
-
-      // B) MATERIALES ASOCIADOS A ESTA PARTIDA (Gastos)
-      if (gastosPartida.length > 0) {
-        let subtotalNetoPartida = 0;
-        let subtotalPvpPartida = 0;
-
-        // Extraer categorías/fases únicas para gastos
-        
-        // Wait, for Gastos, typically the user wrote descriptions directly. Let's just group by "MATERIAL:" default if needed.
-        // Actually, looking at screenshot 3, it says "MATERIAL:", "MOBILIARIO DE COCINA:".
-        // Let's just use the current categories logic or assume they want a header per category.
-        
-        const catMap = {};
-        gastosPartida.forEach(g => {
-            const c = g.descripcion || "MATERIAL";
-            if (!catMap[c]) catMap[c] = [];
-            catMap[c].push(g);
-        });
-
-        // Simplified for Gastos based on their Excel layout
-        datosExcel.push(["", {v: "MATERIAL:", s: styleHeaderGasto}, "", "", "", "", "", ""]);
-        
-        gastosPartida.forEach(g => {
-          gastosYaProcesados.add(g.id);
-          const subNeto = (g.precioNeto || 0) * (g.udsHoras || 1);
-          const subPvp = (g.precioPvp || 0) * (g.udsHoras || 1);
-          subtotalNetoPartida += subNeto;
-          subtotalPvpPartida += subPvp;
-          granTotalNeto += subNeto;
-          granTotalPvp += subPvp;
-
-          datosExcel.push([
-            g.fecha || '',
-            g.descripcion,
-            g.provTrabajador,
-            g.udsHoras,
-            g.precioNeto > 0 ? g.precioNeto : "",
-            subNeto > 0 ? subNeto : "",
-            g.precioPvp > 0 ? g.precioPvp : "",
-            subPvp > 0 ? subPvp : ""
-          ]);
-        });
-
-        datosExcel.push(["", "", {v: "TOTAL €", s: styleHeaderGasto}, "", "", subtotalNetoPartida > 0 ? subtotalNetoPartida : "", "", subtotalPvpPartida > 0 ? subtotalPvpPartida : ""]);
-        datosExcel.push([]);
-      }
-    });
-
-    // 7. Materiales / Gastos restantes por categoría (Herrajes, Vidrios, etc.)
+  
+      // 7. Materiales / Gastos restantes por categoría (Herrajes, Vidrios, etc.)
     const gastosSueltos = gastosObra.filter(g => !gastosYaProcesados.has(g.id));
     if (gastosSueltos.length > 0) {
       const categoriasRestantes = [...new Set(gastosSueltos.map(g => (g.categoria || 'VARIOS').toUpperCase()))];
@@ -1867,12 +1866,12 @@ function App() {
                       fetch(`${API_BASE_URL}/api/entregas`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ idObra: obraSeleccionadaEntregas.id, descripcion: nuevaEntregaDesc, cantidad: parseFloat(nuevaEntregaCant) })
-                      }).then(res => { if(!res.ok) throw new Error("Error en API"); return res.json(); }).then(nueva => {
+                      }).then(async res => { if(!res.ok) { const text = await res.text(); throw new Error(`Status ${res.status}: ${text}`); } return res.json(); }).then(nueva => {
                          setEntregasObra([...(Array.isArray(entregasObra) ? entregasObra : []), nueva]);
                          setNuevaEntregaDesc('');
                          setNuevaEntregaCant('');
                       }).catch(err => {
-                         alert("Error al guardar la entrega. Asegúrate de haber REINICIADO tu servidor backend (Java) para que reconozca los nuevos cambios.");
+                         alert("Error al guardar la entrega: " + err.message + "\n\nAsegúrate de haber reiniciado tu backend.");
                          console.error(err);
                       });
                     }} className="btn-action" style={{ backgroundColor: '#2ecc71', padding: '8px 16px' }}>➕ Añadir</button>
