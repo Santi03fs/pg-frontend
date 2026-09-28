@@ -1020,11 +1020,15 @@ function App() {
     const gastosYaProcesados = new Set();
 
     // ESTILOS EXCEL
-    const styleHeaderPartida = { fill: { fgColor: { rgb: "D9D9D9" } }, font: { bold: true } };
+    const styleHeaderPartida = { fill: { fgColor: { rgb: "D9D9D9" } }, font: { bold: true, sz: 12, color: { rgb: "000000" } } };
     const styleHeaderGasto = { font: { bold: true } };
-    const styleFaseNegrita = { font: { bold: true } };
+    const styleFaseNegrita = { font: { bold: true, color: { rgb: "333333" } } };
+    const styleFaseNormal = { font: { color: { rgb: "444444" } } };
+    const styleTotalHoras = { fill: { fgColor: { rgb: "F4F6F6" } }, font: { bold: true, color: { rgb: "117A65" } } };
+    const styleHeaderMaterial = { fill: { fgColor: { rgb: "EBF5FB" } }, font: { bold: true, color: { rgb: "154360" }, sz: 11 } };
+    const styleTotalMaterial = { fill: { fgColor: { rgb: "FEF9E7" } }, font: { bold: true, color: { rgb: "9A7D0A" } } };
 
-    // 5. Generar bloques por cada PARTIDA
+    // 5. Generar bloques// 5. Generar bloques por cada PARTIDA
       listaPartidas.forEach(partidaNombre => {
         const pNorm = partidaNombre.toLowerCase();
         const horasPartida = horasObra.filter(h => (h.partida || '').trim().toLowerCase() === pNorm);
