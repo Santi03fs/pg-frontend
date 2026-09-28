@@ -1871,6 +1871,9 @@ function App() {
                          setEntregasObra([...(Array.isArray(entregasObra) ? entregasObra : []), nueva]);
                          setNuevaEntregaDesc('');
                          setNuevaEntregaCant('');
+                      }).catch(err => {
+                         alert("Error al guardar la entrega. Asegúrate de haber REINICIADO tu servidor backend (Java) para que reconozca los nuevos cambios.");
+                         console.error(err);
                       });
                     }} className="btn-action" style={{ backgroundColor: '#2ecc71', padding: '8px 16px' }}>➕ Añadir</button>
                   </div>
