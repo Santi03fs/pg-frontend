@@ -73,6 +73,10 @@ function App() {
   const [obraSeleccionadaPartidas, setObraSeleccionadaPartidas] = useState(null);
   const [obraSeleccionadaFases, setObraSeleccionadaFases] = useState(null);
   const [partidasObra, setPartidasObra] = useState([]);
+  const [obraSeleccionadaEntregas, setObraSeleccionadaEntregas] = useState(null);
+  const [entregasObra, setEntregasObra] = useState([]);
+  const [nuevaEntregaDesc, setNuevaEntregaDesc] = useState('');
+  const [nuevaEntregaCant, setNuevaEntregaCant] = useState('');
   const [fasesObra, setFasesObra] = useState([]);
 
   // Estados para Edición de Trabajador
@@ -937,7 +941,7 @@ function App() {
   };
 
   // ================= LA MAGIA DE EXPORTAR A EXCEL (ESTRUCTURA EXACTA DE PARTIDAS Y FASES) =================
-  const exportarObraExcel = (idObra) => {
+  const exportarObraExcel = async (idObra) => {
     const targetId = Number(idObra);
     const obraTarget = obras.find(o => Number(o.id) === targetId);
     if (!obraTarget) return alert("No se pudo encontrar la información de esta obra.");
@@ -959,6 +963,17 @@ function App() {
     }
 
     const datosExcel = [];
+    // Fetch entregas
+    let entregasObraList = [];
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/entregas/obra/${targetId}`);
+      if (res.ok) {
+        entregasObraList = await res.json();
+      }
+    } catch(err) {
+      console.error("Error fetching entregas", err);
+    }
+
     
     // 1. Cabecera superior idéntica a las fotos
     datosExcel.push(["CLIENTE:", obraTarget.cliente || obraTarget.nombreObra || "", "", "", "", "", "", ""]);
@@ -1167,10 +1182,17 @@ function App() {
     datosExcel.push(["", "", {v: "TOTAL GENERAL PVP", s: styleHeaderGasto}, "", "", "", "", granTotalPvp > 0 ? granTotalPvp : ""]);
     datosExcel.push([]);
 
-    const entrega1 = parseFloat(obraTarget.presupuestoPvp) || 0;
-    datosExcel.push([{v: "ENTREGA A CUENTA 1 ()", s: styleHeaderGasto}, "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
-    datosExcel.push([{v: "ENTREGA A CUENTA 2 ()", s: styleHeaderGasto}, "", "", "", "", "", "", ""]);
-    datosExcel.push([{v: "TOTAL ENTREGAS", s: styleHeaderGasto}, "", "", "", "", entrega1 > 0 ? entrega1 : "", "", ""]);
+    let totalEntregas = 0;
+    if (entregasObraList.length > 0) {
+       entregasObraList.forEach(e => {
+         const cant = parseFloat(e.cantidad) || 0;
+         totalEntregas += cant;
+         datosExcel.push([{v: (e.descripcion || "ENTREGA A CUENTA").toUpperCase(), s: styleHeaderGasto}, "", "", "", "", cant > 0 ? cant : "", "", ""]);
+       });
+    } else {
+       datosExcel.push([{v: "ENTREGA A CUENTA 1 ()", s: styleHeaderGasto}, "", "", "", "", "", "", ""]);
+    }
+    datosExcel.push([{v: "TOTAL ENTREGAS", s: styleHeaderGasto}, "", "", "", "", totalEntregas > 0 ? totalEntregas : "", "", ""]);
 
     const hoja = XLSX.utils.aoa_to_sheet(datosExcel);
 
@@ -1801,7 +1823,61 @@ function App() {
               </div>
             )}
 
-      {/* MODAL CONFIGURADOR DE PARTIDAS */}
+      
+              {/* MODAL ENTREGAS A CUENTA */}
+              {obraSeleccionadaEntregas && (
+                <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#fff', border: '2px solid #16a085', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, color: '#16a085' }}>💰 Entregas a Cuenta - {obraSeleccionadaEntregas.nombreObra}</h3>
+                    <button onClick={() => setObraSeleccionadaEntregas(null)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>✖ Cerrar</button>
+                  </div>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    {entregasObra.length === 0 ? <p>No hay entregas registradas para esta obra.</p> : 
+                      <table className="styled-table">
+                        <thead>
+                          <tr><th>Descripción</th><th>Cantidad (€)</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                          {entregasObra.map(e => (
+                            <tr key={e.id}>
+                              <td>{e.descripcion}</td>
+                              <td>{e.cantidad} €</td>
+                              <td>
+                                <button onClick={() => {
+                                  if (window.confirm("¿Seguro que quieres eliminar esta entrega?")) {
+                                    fetch(`${API_BASE_URL}/api/entregas/${e.id}`, { method: 'DELETE' })
+                                      .then(() => setEntregasObra(entregasObra.filter(en => en.id !== e.id)));
+                                  }
+                                }} className="btn-delete" style={{ padding: '4px 8px' }}>🗑️</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    }
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', padding: '15px', background: '#f9f9f9', borderRadius: '8px' }}>
+                    <input className="input-standard" placeholder="Ej: ENTREGA A CUENTA 1" value={nuevaEntregaDesc} onChange={e => setNuevaEntregaDesc(e.target.value)} style={{ flex: 2 }} />
+                    <input className="input-standard" type="number" placeholder="Cantidad (€)" value={nuevaEntregaCant} onChange={e => setNuevaEntregaCant(e.target.value)} style={{ flex: 1 }} />
+                    <button onClick={() => {
+                      if (!nuevaEntregaDesc || !nuevaEntregaCant) return alert('Completa todos los campos');
+                      fetch(`${API_BASE_URL}/api/entregas`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idObra: obraSeleccionadaEntregas.id, descripcion: nuevaEntregaDesc, cantidad: parseFloat(nuevaEntregaCant) })
+                      }).then(res => res.json()).then(nueva => {
+                         setEntregasObra([...entregasObra, nueva]);
+                         setNuevaEntregaDesc('');
+                         setNuevaEntregaCant('');
+                      });
+                    }} className="btn-action" style={{ backgroundColor: '#2ecc71', padding: '8px 16px' }}>➕ Añadir</button>
+                  </div>
+                </div>
+              )}
+              
+              {/* MODAL CONFIGURADOR DE PARTIDAS */}
+
             {obraSeleccionadaPartidas && (
               <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#fff', border: '2px solid #e67e22', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
