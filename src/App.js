@@ -1834,13 +1834,13 @@ function App() {
                   </div>
                   
                   <div style={{ marginBottom: '20px' }}>
-                    {entregasObra.length === 0 ? <p>No hay entregas registradas para esta obra.</p> : 
+                    {(!Array.isArray(entregasObra) || entregasObra.length === 0) ? <p>No hay entregas registradas para esta obra.</p> : 
                       <table className="styled-table">
                         <thead>
                           <tr><th>Descripción</th><th>Cantidad (€)</th><th>Acciones</th></tr>
                         </thead>
                         <tbody>
-                          {entregasObra.map(e => (
+                          {(Array.isArray(entregasObra) ? entregasObra : []).map(e => (
                             <tr key={e.id}>
                               <td>{e.descripcion}</td>
                               <td>{e.cantidad} €</td>
@@ -1867,8 +1867,8 @@ function App() {
                       fetch(`${API_BASE_URL}/api/entregas`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ idObra: obraSeleccionadaEntregas.id, descripcion: nuevaEntregaDesc, cantidad: parseFloat(nuevaEntregaCant) })
-                      }).then(res => res.json()).then(nueva => {
-                         setEntregasObra([...entregasObra, nueva]);
+                      }).then(res => { if(!res.ok) throw new Error("Error en API"); return res.json(); }).then(nueva => {
+                         setEntregasObra([...(Array.isArray(entregasObra) ? entregasObra : []), nueva]);
                          setNuevaEntregaDesc('');
                          setNuevaEntregaCant('');
                       });
