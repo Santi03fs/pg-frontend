@@ -2165,8 +2165,8 @@ function App() {
                   </thead>
                   <tbody>
                     {cuadrante.map((diaInfo, index) => {
-                        const trabajadorSeleccionado = trabajadores.find(t => t.id === parseInt(trabajadorFiltro));
-                        const esExtra = trabajadorSeleccionado && trabajadorSeleccionado.rol === 'EXTRA';
+                        const trabajadorSeleccionado = trabajadores.find(t => Number(t.id) === Number(trabajadorFiltro));
+                        const esExtra = trabajadorSeleccionado && (trabajadorSeleccionado.rol === 'EXTRA' || trabajadorSeleccionado.esExtra);
                         const haTrabajado = diaInfo.asistencia === 'Sí' || parseFloat(diaInfo.horas) > 0 || diaInfo.idObra;
                         
                         let bgColor = 'transparent';
