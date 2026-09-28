@@ -2165,13 +2165,24 @@ function App() {
                   </thead>
                   <tbody>
                     {cuadrante.map((diaInfo, index) => {
-                      const claseFila = diaInfo.esFinde ? "fondo-amarillo" : "";
-                      const partesHorario = (diaInfo.horario || ' a ').split(' a ');
-                      const horaEntrada = partesHorario[0] || '';
-                      const horaSalida = partesHorario[1] || '';
+                        const trabajadorSeleccionado = trabajadores.find(t => t.id === parseInt(trabajadorFiltro));
+                        const esExtra = trabajadorSeleccionado && trabajadorSeleccionado.rol === 'EXTRA';
+                        const haTrabajado = diaInfo.asistencia === 'Sí' || parseFloat(diaInfo.horas) > 0 || diaInfo.idObra;
+                        
+                        let bgColor = 'transparent';
+                        if (diaInfo.esFinde) {
+                            bgColor = '#fff200';
+                        } else if (esExtra && haTrabajado) {
+                            bgColor = '#fcd670'; // Naranja/Amarillo clarito para EXTRA
+                        }
 
-                      return (
-                        <tr key={index} className={claseFila} style={{ backgroundColor: diaInfo.esFinde ? '#fff200' : 'transparent', borderBottom: '1px solid black' }}>
+                        const claseFila = diaInfo.esFinde ? "fondo-amarillo" : (esExtra && haTrabajado ? "fondo-extra" : "");
+                        const partesHorario = (diaInfo.horario || ' a ').split(' a ');
+                        const horaEntrada = partesHorario[0] || '';
+                        const horaSalida = partesHorario[1] || '';
+  
+                        return (
+                          <tr key={index} className={claseFila} style={{ backgroundColor: bgColor, borderBottom: '1px solid black' }}>
                           <td style={{ border: '1px solid black', fontWeight: 'bold' }}>{diaInfo.nDia}</td>
                           <td style={{ border: '1px solid black' }}>{diaInfo.nMes}</td>
                           <td style={{ border: '1px solid black' }}>{diaInfo.nSem}</td>
