@@ -122,7 +122,9 @@ function App() {
   // ================= ESTADOS INFORME EDITABLE Y FILTROS =================
   const [mesFiltro, setMesFiltro] = useState(new Date().toISOString().slice(0, 7));
   const [trabajadorFiltro, setTrabajadorFiltro] = useState('');
-  const [cuadrante, setCuadrante] = useState([]); 
+  const [cuadrante, setCuadrante] = useState([]);
+  const [precioHoraNominaGlobal, setPrecioHoraNominaGlobal] = useState('');
+  const [precioHoraExtraNominaGlobal, setPrecioHoraExtraNominaGlobal] = useState(''); 
   
   const [filtroObraGastos, setFiltroObraGastos] = useState('');
 
@@ -410,9 +412,44 @@ function App() {
           });
         }
       }
+      // Inicializar precios globales para el autocompletado superior
+      const parteConPrecio = asistencias.find(a => 
+        Number(a.idTrabajador) === parseInt(trabajadorFiltro) && 
+        a.fecha && a.fecha.startsWith(mesFiltro) && 
+        a.precioHora !== undefined && a.precioHora !== null && Number(a.precioHora) > 0
+      );
+      const parteConPrecioExtra = asistencias.find(a => 
+        Number(a.idTrabajador) === parseInt(trabajadorFiltro) && 
+        a.fecha && a.fecha.startsWith(mesFiltro) && 
+        a.precioHoraExtra !== undefined && a.precioHoraExtra !== null && Number(a.precioHoraExtra) > 0
+      );
+
+      const trabInfo = trabajadores.find(t => t.id === parseInt(trabajadorFiltro));
+      const defH = (trabInfo?.precioHora && Number(trabInfo.precioHora) > 0)
+        ? trabInfo.precioHora
+        : ((trabInfo?.pagoDiario && trabInfo?.horasJornada && Number(trabInfo.horasJornada) > 0)
+            ? (Number(trabInfo.pagoDiario) / Number(trabInfo.horasJornada)).toFixed(2)
+            : '');
+      const defHExtra = (trabInfo?.precioHoraExtra && Number(trabInfo.precioHoraExtra) > 0)
+        ? trabInfo.precioHoraExtra
+        : '';
+
+      setPrecioHoraNominaGlobal(parteConPrecio ? parteConPrecio.precioHora : (defH || ''));
+      setPrecioHoraExtraNominaGlobal(parteConPrecioExtra ? parteConPrecioExtra.precioHoraExtra : (defHExtra || ''));
+
       setCuadrante(nuevoCuadrante);
     }
   }, [mesFiltro, trabajadorFiltro, asistencias, obras, trabajadores]);
+
+  const handleCambiarPrecioHoraGlobal = (nuevoPrecio) => {
+    setPrecioHoraNominaGlobal(nuevoPrecio);
+    setCuadrante(prev => prev.map(dia => ({ ...dia, precioHora: nuevoPrecio })));
+  };
+
+  const handleCambiarPrecioHoraExtraGlobal = (nuevoPrecio) => {
+    setPrecioHoraExtraNominaGlobal(nuevoPrecio);
+    setCuadrante(prev => prev.map(dia => ({ ...dia, precioHoraExtra: nuevoPrecio })));
+  };
 
   const handleAddRowCuadrante = (index) => {
     const targetDay = cuadrante[index];
@@ -2358,21 +2395,65 @@ function App() {
         {seccionActiva === 'nominas' && (usuarioActual?.rol === 'ADMIN' || usuarioActual?.rol === 'JEFE') && (
           <section>
             <div className="no-print" style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #eee', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="filtro-container">
+              <div className="filtro-container" style={{ minWidth: '220px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Trabajador:</label>
                 <select className="input-standard" value={trabajadorFiltro} onChange={e => setTrabajadorFiltro(e.target.value)}>
                   <option value="">-- Elige un trabajador --</option>{trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre} ({t.rol || 'Obra'})</option>)}
                 </select>
               </div>
-              <div className="filtro-container">
+
+              <div className="filtro-container" style={{ minWidth: '160px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Mes de la Nómina:</label>
                 <input className="input-standard" type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} />
               </div>
+
               {trabajadorFiltro && (
-                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
-                  <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#27ae60', flex: 1, padding: '10px 5px', fontSize: '12px' }}>💾 GUARDAR NÓMINA</button>
-                  <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad', flex: 1, padding: '10px 5px', fontSize: '12px' }}>🖨️ IMPRIMIR NÓMINA</button>
-                </div>
+                <>
+                  <div className="filtro-container" style={{ minWidth: '190px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#16a085' }}>
+                      <span>⏱️ Precio hora normal (€):</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input 
+                        className="input-standard" 
+                        type="number" 
+                        step="0.5" 
+                        min="0"
+                        placeholder="Ej: 15.00" 
+                        value={precioHoraNominaGlobal} 
+                        onChange={e => handleCambiarPrecioHoraGlobal(e.target.value)} 
+                        style={{ paddingRight: '40px', borderColor: '#16a085', fontWeight: 'bold', color: '#16a085', backgroundColor: '#f0fdf4' }}
+                        title="Al cambiar este precio se autocompleta en todas las filas de la nómina"
+                      />
+                      <span style={{ position: 'absolute', right: '12px', color: '#16a085', fontWeight: 'bold', fontSize: '12px', pointerEvents: 'none' }}>€/h</span>
+                    </div>
+                  </div>
+
+                  <div className="filtro-container" style={{ minWidth: '190px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#c0392b' }}>
+                      <span>🔥 Precio de hora extra (€):</span>
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input 
+                        className="input-standard" 
+                        type="number" 
+                        step="0.5" 
+                        min="0"
+                        placeholder="Ej: 20.00" 
+                        value={precioHoraExtraNominaGlobal} 
+                        onChange={e => handleCambiarPrecioHoraExtraGlobal(e.target.value)} 
+                        style={{ paddingRight: '40px', borderColor: '#e74c3c', fontWeight: 'bold', color: '#c0392b', backgroundColor: '#fef2f2' }}
+                        title="Al cambiar este precio se autocompleta en todas las filas de la nómina"
+                      />
+                      <span style={{ position: 'absolute', right: '12px', color: '#c0392b', fontWeight: 'bold', fontSize: '12px', pointerEvents: 'none' }}>€/h</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                    <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#27ae60', flex: 1, padding: '10px 5px', fontSize: '12px' }}>💾 GUARDAR NÓMINA</button>
+                    <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad', flex: 1, padding: '10px 5px', fontSize: '12px' }}>🖨️ IMPRIMIR NÓMINA</button>
+                  </div>
+                </>
               )}
             </div>
 
