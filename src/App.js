@@ -83,6 +83,8 @@ function App() {
   const [idTrabajadorEdit, setIdTrabajadorEdit] = useState(null);
   const [horasJornadaTrabajador, setHorasJornadaTrabajador] = useState('8.0');
   const [pagoDiarioTrabajador, setPagoDiarioTrabajador] = useState('0.0');
+  const [precioHoraTrabajador, setPrecioHoraTrabajador] = useState('0.0');
+  const [precioHoraExtraTrabajador, setPrecioHoraExtraTrabajador] = useState('0.0');
   const [rolTrabajador, setRolTrabajador] = useState('Obra'); // 'Oficina', 'Obra', 'Hotel'
   const [esExtraTrabajador, setEsExtraTrabajador] = useState(false);
 
@@ -349,7 +351,19 @@ function App() {
   const totalFacturadoPvp = gastosFiltrados.reduce((s, g) => s + (g.precioPvp || 0), 0);
   const beneficioTotal = totalFacturadoPvp - totalGastosNeto;
 
-  // ================= LÓGICA DEL CUADRANTE EDITABLE (INFORMES) =================
+  // ================= CONTROL DE ACCESO POR ROLES =================
+  useEffect(() => {
+    if (usuarioActual) {
+      if (seccionActiva === 'usuarios' && usuarioActual.rol !== 'ADMIN') {
+        setSeccionActiva('diario');
+      }
+      if (seccionActiva === 'nominas' && usuarioActual.rol !== 'ADMIN' && usuarioActual.rol !== 'JEFE') {
+        setSeccionActiva('diario');
+      }
+    }
+  }, [usuarioActual, seccionActiva]);
+
+  // ================= LÓGICA DEL CUADRANTE EDITABLE (INFORMES Y NÓMINAS) =================
   useEffect(() => {
     if (mesFiltro && trabajadorFiltro && obras.length > 0) {
       const [year, month] = mesFiltro.split('-');
@@ -364,11 +378,22 @@ function App() {
         const fechaStr = `${year}-${month}-${String(i).padStart(2, '0')}`;
         
         const partesDb = asistencias.filter(a => Number(a.idTrabajador) === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
+        const trabObj = trabajadores.find(t => t.id === parseInt(trabajadorFiltro));
+        const defaultPrecioH = (trabObj?.precioHora && Number(trabObj.precioHora) > 0)
+          ? trabObj.precioHora
+          : ((trabObj?.pagoDiario && trabObj?.horasJornada && Number(trabObj.horasJornada) > 0)
+              ? (Number(trabObj.pagoDiario) / Number(trabObj.horasJornada)).toFixed(2)
+              : '');
+        const defaultPrecioHExtra = (trabObj?.precioHoraExtra && Number(trabObj.precioHoraExtra) > 0)
+          ? trabObj.precioHoraExtra
+          : '';
         
         if (partesDb.length === 0) {
           nuevoCuadrante.push({
             nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
-            fechaStr, idAsis: null, asistencia: '', horario: '', idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', tipoPago: 'Normal', pagoDia: 0.0
+            fechaStr, idAsis: null, asistencia: '', horario: '', idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', tipoPago: 'Normal', pagoDia: 0.0,
+            precioHora: defaultPrecioH,
+            precioHoraExtra: defaultPrecioHExtra
           });
         } else {
           partesDb.forEach(parteDb => {
@@ -378,19 +403,21 @@ function App() {
               horario: parteDb.horario || '', idObra: parteDb.idObra || '', partida: parteDb.partida || '', 
               horas: parteDb.horasTrabajadas !== undefined && parteDb.horasTrabajadas !== null ? parteDb.horasTrabajadas : '',
               horasExtra: parteDb.horasExtra !== undefined && parteDb.horasExtra !== null ? parteDb.horasExtra : '',
-              descripcionExtra: parteDb.descripcion || '', tipoPago: parteDb.tipoPago || 'Normal', pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0
+              descripcionExtra: parteDb.descripcion || '', tipoPago: parteDb.tipoPago || 'Normal', pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0,
+              precioHora: (parteDb.precioHora !== undefined && parteDb.precioHora !== null && parteDb.precioHora !== 0) ? parteDb.precioHora : defaultPrecioH,
+              precioHoraExtra: (parteDb.precioHoraExtra !== undefined && parteDb.precioHoraExtra !== null && parteDb.precioHoraExtra !== 0) ? parteDb.precioHoraExtra : defaultPrecioHExtra
             });
           });
         }
       }
       setCuadrante(nuevoCuadrante);
     }
-  }, [mesFiltro, trabajadorFiltro, asistencias, obras]);
+  }, [mesFiltro, trabajadorFiltro, asistencias, obras, trabajadores]);
 
   const handleAddRowCuadrante = (index) => {
     const targetDay = cuadrante[index];
     const newRow = {
-      ...targetDay, idAsis: null, asistencia: 'Sí', horario: targetDay.horario, idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', isNewRow: true
+      ...targetDay, idAsis: null, asistencia: 'Sí', horario: targetDay.horario, idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', precioHora: targetDay.precioHora || '', precioHoraExtra: targetDay.precioHoraExtra || '', isNewRow: true
     };
     const copia = [...cuadrante];
     copia.splice(index + 1, 0, newRow);
@@ -431,6 +458,8 @@ function App() {
       (d.descripcionExtra && d.descripcionExtra.trim() !== '') || 
       (d.horas && String(d.horas).trim() !== '') || 
       (d.horasExtra && String(d.horasExtra).trim() !== '') ||
+      (d.precioHora && String(d.precioHora).trim() !== '') ||
+      (d.precioHoraExtra && String(d.precioHoraExtra).trim() !== '') ||
       (d.horario && d.horario.trim() !== '' && d.horario !== ' a ')
     );
 
@@ -465,6 +494,8 @@ function App() {
         estadoAsistencia: estadoVal,
         horasTrabajadas: dia.horas !== '' && dia.horas !== null && !isNaN(parseFloat(dia.horas)) ? parseFloat(dia.horas) : null,
         horasExtra: dia.horasExtra !== '' && dia.horasExtra !== null && !isNaN(parseFloat(dia.horasExtra)) ? parseFloat(dia.horasExtra) : 0.0,
+        precioHora: dia.precioHora !== '' && dia.precioHora !== null && !isNaN(parseFloat(dia.precioHora)) ? parseFloat(dia.precioHora) : 0.0,
+        precioHoraExtra: dia.precioHoraExtra !== '' && dia.precioHoraExtra !== null && !isNaN(parseFloat(dia.precioHoraExtra)) ? parseFloat(dia.precioHoraExtra) : 0.0,
         horario: dia.horario || '',
         partida: dia.partida || '',
         descripcion: dia.descripcionExtra || '',
@@ -756,6 +787,8 @@ function App() {
     setEsExtraTrabajador(Boolean(t.esExtra || t.rol === 'EXTRA'));
     setHorasJornadaTrabajador(t.horasJornada !== undefined && t.horasJornada !== null ? String(t.horasJornada) : '8.0');
     setPagoDiarioTrabajador(t.pagoDiario !== undefined && t.pagoDiario !== null ? String(t.pagoDiario) : '0.0');
+    setPrecioHoraTrabajador(t.precioHora !== undefined && t.precioHora !== null ? String(t.precioHora) : '0.0');
+    setPrecioHoraExtraTrabajador(t.precioHoraExtra !== undefined && t.precioHoraExtra !== null ? String(t.precioHoraExtra) : '0.0');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -766,6 +799,8 @@ function App() {
     setEsExtraTrabajador(false);
     setHorasJornadaTrabajador('8.0'); 
     setPagoDiarioTrabajador('0.0');
+    setPrecioHoraTrabajador('0.0');
+    setPrecioHoraExtraTrabajador('0.0');
   };
 
   const iniciarEdicionObra = (o) => {
@@ -896,7 +931,9 @@ function App() {
       esExtra: esExtraVal,
       estado: 'Activo', 
       horasJornada: parseFloat(horasJornadaTrabajador) || 8.0, 
-      pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0 
+      pagoDiario: parseFloat(pagoDiarioTrabajador) || 0.0,
+      precioHora: parseFloat(precioHoraTrabajador) || 0.0,
+      precioHoraExtra: parseFloat(precioHoraExtraTrabajador) || 0.0
     };
     fetch(`${API_BASE_URL}/api/trabajadores`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then(() => { 
@@ -904,7 +941,9 @@ function App() {
       setRolTrabajador('Obra');
       setEsExtraTrabajador(false);
       setHorasJornadaTrabajador('8.0'); 
-      setPagoDiarioTrabajador('0.0'); 
+      setPagoDiarioTrabajador('0.0');
+      setPrecioHoraTrabajador('0.0');
+      setPrecioHoraExtraTrabajador('0.0'); 
       setIdTrabajadorEdit(null); 
       cargarTrabajadores(); 
     }); 
@@ -1258,11 +1297,25 @@ function App() {
       }
     });
 
-  // Totales calculados para el cuadrante de Partes
+  // Totales calculados para el cuadrante de Partes y Nóminas
   const totalHorasNormales = cuadrante.reduce((acc, d) => acc + (parseFloat(d.horas) || 0), 0);
   const totalHorasExtra = cuadrante.reduce((acc, d) => acc + (parseFloat(d.horasExtra) || 0), 0);
   const granTotalHoras = totalHorasNormales + totalHorasExtra;
-  const totalDiasAsistidos = cuadrante.filter(d => d.asistencia === 'Sí').length;
+  const totalDiasAsistidos = cuadrante.filter(d => d.asistencia === 'Sí' || d.asistencia === 'Presente').length;
+
+  const totalImporteHoras = cuadrante.reduce((acc, d) => {
+    const h = parseFloat(d.horas) || 0;
+    const p = parseFloat(d.precioHora) || 0;
+    return acc + (h * p);
+  }, 0);
+
+  const totalImporteHorasExtra = cuadrante.reduce((acc, d) => {
+    const h = parseFloat(d.horasExtra) || 0;
+    const p = parseFloat(d.precioHoraExtra) || 0;
+    return acc + (h * p);
+  }, 0);
+
+  const totalNominaEuros = totalImporteHoras + totalImporteHorasExtra;
 
   if (!isAuthenticated) {
     return (
@@ -1389,7 +1442,27 @@ function App() {
           <button onClick={() => setSeccionActiva('trabajadores')} className={`btn-nav ${seccionActiva === 'trabajadores' ? 'active' : ''}`}>👥 Personal</button>
           <button onClick={() => setSeccionActiva('gastos')} className={`btn-nav ${seccionActiva === 'gastos' ? 'active' : ''}`}>💰 Gastos</button>
           <button onClick={() => setSeccionActiva('informes')} className={`btn-nav ${seccionActiva === 'informes' ? 'active' : ''}`}>📑 Partes</button>
+          {(usuarioActual?.rol === 'ADMIN' || usuarioActual?.rol === 'JEFE') && (
+            <button onClick={() => setSeccionActiva('nominas')} className={`btn-nav ${seccionActiva === 'nominas' ? 'active' : ''}`}>💼 Nóminas</button>
+          )}
           {usuarioActual?.rol === 'ADMIN' && <button onClick={() => setSeccionActiva('usuarios')} className={`btn-nav ${seccionActiva === 'usuarios' ? 'active' : ''}`}>⚙️ Ajustes</button>}
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '6px', marginRight: '6px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>
+              👤 {usuarioActual?.nombre || usuarioActual?.username}
+            </span>
+            <span style={{ 
+              fontSize: '11px', 
+              fontWeight: 'bold', 
+              padding: '2px 8px', 
+              borderRadius: '12px', 
+              color: 'white', 
+              backgroundColor: usuarioActual?.rol === 'ADMIN' ? '#e74c3c' : usuarioActual?.rol === 'JEFE' ? '#8e44ad' : usuarioActual?.rol === 'OFICINA' ? '#16a085' : '#3498db' 
+            }}>
+              {usuarioActual?.rol}
+            </span>
+          </div>
+
           <button onClick={handleLogout} className="btn-nav btn-logout-header">Salir</button>
         </div>
       </header>
@@ -1969,6 +2042,8 @@ function App() {
               </select>
               <input type="number" step="0.5" className="input-standard" placeholder="Horas Jornada (Ej: 8.0)" value={horasJornadaTrabajador} onChange={e=>setHorasJornadaTrabajador(e.target.value)} required />
               <input type="number" step="1" className="input-standard" placeholder="Pago Diario (€) (Ej: 120)" value={pagoDiarioTrabajador} onChange={e=>setPagoDiarioTrabajador(e.target.value)} required />
+              <input type="number" step="0.5" className="input-standard" placeholder="Precio Hora (€/h) (Ej: 15)" value={precioHoraTrabajador} onChange={e=>setPrecioHoraTrabajador(e.target.value)} />
+              <input type="number" step="0.5" className="input-standard" placeholder="Precio Hora Extra (€/h) (Ej: 20)" value={precioHoraExtraTrabajador} onChange={e=>setPrecioHoraExtraTrabajador(e.target.value)} />
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button type="submit" className="btn-action" style={{ backgroundColor: idTrabajadorEdit ? '#3498db' : '#2ecc71', flex: 2 }}>{idTrabajadorEdit ? '💾 Guardar Cambios' : '➕ Añadir Trabajador'}</button>
                 {idTrabajadorEdit && <button type="button" onClick={cancelarEdicionTrabajador} className="btn-action" style={{ backgroundColor: '#95a5a6', flex: 1 }}>❌ Cancelar Edición</button>}
@@ -1976,7 +2051,7 @@ function App() {
             </form>
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
-                <thead><tr style={{background: '#2ecc71'}}><th>ID</th><th>Nombre</th><th>Rol</th><th>Jornada (h)</th><th>Pago Diario</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <thead><tr style={{background: '#2ecc71'}}><th>ID</th><th>Nombre</th><th>Rol</th><th>Jornada (h)</th><th>Pago Diario</th><th>Precio/Hora</th><th>Precio H.Extra</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>
                   {trabajadores.map(t => (
                     <tr key={t.id}>
@@ -2019,6 +2094,8 @@ function App() {
                       </td>
                       <td style={{ fontWeight: 'bold' }}>{t.horasJornada !== undefined && t.horasJornada !== null ? t.horasJornada : 8.0} h</td>
                       <td style={{ fontWeight: 'bold', color: '#27ae60' }}>{t.pagoDiario !== undefined && t.pagoDiario !== null ? t.pagoDiario : 0} €</td>
+                      <td style={{ fontWeight: 'bold', color: '#16a085' }}>{t.precioHora !== undefined && t.precioHora !== null ? t.precioHora : 0} €/h</td>
+                      <td style={{ fontWeight: 'bold', color: '#c0392b' }}>{t.precioHoraExtra !== undefined && t.precioHoraExtra !== null ? t.precioHoraExtra : 0} €/h</td>
                       <td>{t.estado}</td>
                       <td style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => iniciarEdicionTrabajador(t)} className="btn-excel" style={{ backgroundColor: '#3498db' }}>✏️ Editar</button>
@@ -2276,6 +2353,186 @@ function App() {
           </section>
         )}
 
+        
+        {/* ================= 5.5. NÓMINAS (ADMIN Y JEFE ONLY) ================= */}
+        {seccionActiva === 'nominas' && (usuarioActual?.rol === 'ADMIN' || usuarioActual?.rol === 'JEFE') && (
+          <section>
+            <div className="no-print" style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '2px solid #eee', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="filtro-container">
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Trabajador:</label>
+                <select className="input-standard" value={trabajadorFiltro} onChange={e => setTrabajadorFiltro(e.target.value)}>
+                  <option value="">-- Elige un trabajador --</option>{trabajadores.map(t => <option key={t.id} value={t.id}>{t.nombre} ({t.rol || 'Obra'})</option>)}
+                </select>
+              </div>
+              <div className="filtro-container">
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px', color: '#7f8c8d' }}>Mes de la Nómina:</label>
+                <input className="input-standard" type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} />
+              </div>
+              {trabajadorFiltro && (
+                <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                  <button onClick={guardarCambiosCuadrante} className="btn-action" style={{ backgroundColor: '#27ae60', flex: 1, padding: '10px 5px', fontSize: '12px' }}>💾 GUARDAR NÓMINA</button>
+                  <button onClick={() => window.print()} className="btn-action" style={{ backgroundColor: '#8e44ad', flex: 1, padding: '10px 5px', fontSize: '12px' }}>🖨️ IMPRIMIR NÓMINA</button>
+                </div>
+              )}
+            </div>
+
+            {trabajadorFiltro ? (
+              <div style={{ marginTop: '10px' }}>
+                <h3 style={{ textAlign: 'center', fontSize: '18px', margin: '0 0 5px 0', textTransform: 'uppercase', color: '#2c3e50' }}>
+                  💼 NÓMINA / LIQUIDACIÓN - {getNombreTrabajador(parseInt(trabajadorFiltro))} ({mesFiltro})
+                </h3>
+                <p style={{ textAlign: 'center', fontSize: '12px', color: '#7f8c8d', margin: '0 0 15px 0' }}>
+                  Control de asistencia, jornada ordinaria, precios por hora y horas extra (Exclusivo Administrador y Jefatura)
+                </p>
+                
+                <table className="tabla-papel" style={{ width: '100%', borderCollapse: 'collapse', border: '1.5px solid black', textAlign: 'center' }}>
+                  <thead>
+                    <tr style={{ background: '#eaf2f8', borderBottom: '2px solid black' }}>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '4%' }}>Día</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '6%' }}>Mes</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '8%' }}>Asistencia</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '14%' }}>Horario (Ent-Sal)</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '18%' }}>Obra</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '8%', color: '#16a085' }}>Precio Hora</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '6%' }}>Horas</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '9%', color: '#c0392b' }}>Precio H. Extra</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '6%' }}>H. Extra</th>
+                      <th style={{ border: '1px solid black', padding: '6px 2px', width: '17%' }}>Descripción</th>
+                      <th className="no-print" style={{ border: '1px solid black', padding: '6px 2px', width: '4%' }}>Acc.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cuadrante.map((diaInfo, index) => {
+                      const claseFila = diaInfo.esFinde ? "fondo-amarillo" : "";
+                      const partesHorario = (diaInfo.horario || ' a ').split(' a ');
+                      const horaEntrada = partesHorario[0] || '';
+                      const horaSalida = partesHorario[1] || '';
+
+                      return (
+                        <tr key={index} className={claseFila} style={{ backgroundColor: diaInfo.esFinde ? '#fff200' : 'transparent', borderBottom: '1px solid black' }}>
+                          {/* 1. Día */}
+                          <td style={{ border: '1px solid black', fontWeight: 'bold' }}>{diaInfo.nDia}</td>
+
+                          {/* 2. Mes */}
+                          <td style={{ border: '1px solid black' }}>{diaInfo.nMes}</td>
+
+                          {/* 3. Asistencia */}
+                          <td style={{ border: '1px solid black' }}>
+                            <select className="input-paper" style={{ textAlign: 'center', fontWeight: 'bold' }} value={diaInfo.asistencia} onChange={e => handleEditCuadrante(index, 'asistencia', e.target.value)}>
+                              <option value=""></option><option value="Sí">Sí</option><option value="No">No</option><option value="Vacaciones">Vacaciones</option>
+                            </select>
+                          </td>
+
+                          {/* 4. Horario (entrada y salida) */}
+                          <td style={{ border: '1px solid black', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                              <select className="input-paper" style={{textAlign: 'center', width: '45%'}} value={horaEntrada} onChange={e => handleEditCuadrante(index, 'horario', `${e.target.value} a ${horaSalida}`)}>
+                                 <option value=""></option>{horasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}
+                              </select>
+                              <span style={{margin: '0 1px', fontWeight: 'bold'}}>-</span>
+                              <select className="input-paper" style={{textAlign: 'center', width: '45%'}} value={horaSalida} onChange={e => handleEditCuadrante(index, 'horario', `${horaEntrada} a ${e.target.value}`)}>
+                                 <option value=""></option>{horasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}
+                              </select>
+                            </div>
+                          </td>
+
+                          {/* 5. Obra */}
+                          <td style={{ border: '1px solid black', textAlign: 'left' }}>
+                            <select className="input-paper" style={{ textAlign: 'left' }} value={diaInfo.idObra} onChange={e => handleEditCuadrante(index, 'idObra', e.target.value)}>
+                              <option value=""></option>{obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra}</option>)}
+                            </select>
+                          </td>
+
+                          {/* 6. Precio Hora */}
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center', color: '#16a085', fontWeight: 'bold'}} type="number" step="0.5" placeholder="0 €" value={diaInfo.precioHora} onChange={e => handleEditCuadrante(index, 'precioHora', e.target.value)} />
+                          </td>
+
+                          {/* 7. Horas */}
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center', fontWeight: 'bold'}} type="number" step="0.5" value={diaInfo.horas} onChange={e => handleEditCuadrante(index, 'horas', e.target.value)} />
+                          </td>
+
+                          {/* 8. Precio Horas Extra */}
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center', color: '#c0392b', fontWeight: 'bold'}} type="number" step="0.5" placeholder="0 €" value={diaInfo.precioHoraExtra} onChange={e => handleEditCuadrante(index, 'precioHoraExtra', e.target.value)} />
+                          </td>
+
+                          {/* 9. Horas Extra */}
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{textAlign: 'center', color: '#e67e22', fontWeight: 'bold'}} type="number" step="0.5" placeholder="0" value={diaInfo.horasExtra} onChange={e => handleEditCuadrante(index, 'horasExtra', e.target.value)} />
+                          </td>
+
+                          {/* 10. Descripción */}
+                          <td style={{ border: '1px solid black' }}>
+                            <input className="input-paper" style={{ textAlign: 'left' }} value={diaInfo.descripcionExtra} onChange={e => handleEditCuadrante(index, 'descripcionExtra', e.target.value)} />
+                          </td>
+
+                          {/* 11. Acciones (+ / ✕) */}
+                          <td className="no-print" style={{ border: '1px solid black' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                              <button type="button" onClick={() => handleAddRowCuadrante(index)} className="btn-partes-accion-add" title="Añadir obra a este día">+</button>
+                              {(diaInfo.idAsis || diaInfo.isNewRow) && <button type="button" onClick={() => handleRemoveRowCuadrante(index)} className="btn-partes-accion-del" title="Eliminar registro">✕</button>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f8f9fa', fontWeight: 'bold', borderTop: '2px solid black' }}>
+                      <td colSpan="5" style={{ border: '1px solid black', textAlign: 'right', padding: '6px 10px', fontSize: '11px' }}>
+                        TOTALES NÓMINA:
+                      </td>
+                      <td style={{ border: '1px solid black', padding: '6px 2px', textAlign: 'center', color: '#16a085', fontSize: '11px', fontWeight: '900' }}>
+                        {totalImporteHoras.toFixed(2)} €
+                      </td>
+                      <td style={{ border: '1px solid black', padding: '6px 2px', textAlign: 'center', color: '#2980b9', fontSize: '11px', fontWeight: '900' }}>
+                        {totalHorasNormales} h
+                      </td>
+                      <td style={{ border: '1px solid black', padding: '6px 2px', textAlign: 'center', color: '#c0392b', fontSize: '11px', fontWeight: '900' }}>
+                        {totalImporteHorasExtra.toFixed(2)} €
+                      </td>
+                      <td style={{ border: '1px solid black', padding: '6px 2px', textAlign: 'center', color: '#e67e22', fontSize: '11px', fontWeight: '900' }}>
+                        {totalHorasExtra} h
+                      </td>
+                      <td colSpan="2" style={{ border: '1px solid black', padding: '6px 4px', textAlign: 'center', background: '#d4efdf', color: '#1e8449', fontSize: '13px', fontWeight: '900' }}>
+                        TOTAL A COBRAR: {totalNominaEuros.toFixed(2)} €
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* RESUMEN VISUAL DE TOTALES NÓMINA */}
+                <div className="resumen-totales-print" style={{ marginTop: '15px', padding: '12px 20px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Días Asistidos</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#334155' }}>{totalDiasAsistidos} días</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Horas Normales</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2980b9' }}>{totalHorasNormales} h ({totalImporteHoras.toFixed(2)} €)</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Horas Extra</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#e67e22' }}>{totalHorasExtra} h ({totalImporteHorasExtra.toFixed(2)} €)</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Horas</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#34495e' }}>{granTotalHoras} h</div>
+                  </div>
+                  <div style={{ textAlign: 'center', background: '#dcfce7', padding: '8px 20px', borderRadius: '8px', border: '1px solid #86efac' }}>
+                    <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Nómina / A Pagar</div>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#15803d' }}>{totalNominaEuros.toFixed(2)} €</div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#95a5a6', border: '2px dashed #ecf0f1', borderRadius: '10px' }}><h3>👈 Selecciona un trabajador y un mes para calcular la nómina.</h3></div>
+            )}
+          </section>
+        )}
+
         {/* ================= 6. GESTIÓN DE USUARIOS (ADMIN ONLY) ================= */}
         {seccionActiva === 'usuarios' && usuarioActual?.rol === 'ADMIN' && (
           <section className="no-print">
@@ -2284,7 +2541,12 @@ function App() {
               <input className="input-standard" placeholder="Nombre completo" value={nombreNuevo} onChange={e=>setNombreNuevo(e.target.value)} required />
               <input className="input-standard" placeholder="Usuario (Ej: juan123)" value={usernameNuevo} onChange={e=>setUsernameNuevo(e.target.value)} required />
               <input className="input-standard" type="password" placeholder="Contraseña" value={passwordNuevo} onChange={e=>setPasswordNuevo(e.target.value)} required />
-              <select className="input-standard" value={rolNuevo} onChange={e=>setRolNuevo(e.target.value)} required><option value="USER">Usuario (USER)</option><option value="ADMIN">Administrador (ADMIN)</option></select>
+              <select className="input-standard" value={rolNuevo} onChange={e=>setRolNuevo(e.target.value)} required>
+                <option value="USER">Usuario Estándar (USER)</option>
+                <option value="OFICINA">Oficina (OFICINA) - Todo menos Nóminas</option>
+                <option value="JEFE">Jefe (JEFE) - Acceso a Nóminas</option>
+                <option value="ADMIN">Administrador (ADMIN) - Acceso Total</option>
+              </select>
               <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#9b59b6', gridColumn: '1 / -1'}}>Crear Nuevo Usuario</button>
             </form>
             <div style={{ overflowX: 'auto' }}>
@@ -2294,7 +2556,14 @@ function App() {
                   {usuarios.map(u => (
                     <tr key={u.id}>
                       <td>{u.id}</td><td><strong>{u.nombre}</strong></td><td><code>{u.username}</code></td>
-                      <td><span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', color: 'white', backgroundColor: u.rol === 'ADMIN' ? '#e74c3c' : '#3498db' }}>{u.rol}</span></td>
+                      <td><span style={{ 
+                        padding: '4px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '11px', 
+                        fontWeight: 'bold', 
+                        color: 'white', 
+                        backgroundColor: u.rol === 'ADMIN' ? '#e74c3c' : u.rol === 'JEFE' ? '#8e44ad' : u.rol === 'OFICINA' ? '#16a085' : '#3498db' 
+                      }}>{u.rol}</span></td>
                       <td><span style={{fontFamily:'monospace', color:'#888'}}>••••••••</span></td>
                       <td>{u.username === usuarioActual.username ? <span style={{fontSize:'12px', color:'#7f8c8d', fontStyle:'italic'}}>Sesión Activa</span> : <button onClick={() => eliminarUsuario(u.id)} className="btn-delete">🗑️ Borrar</button>}</td>
                     </tr>
