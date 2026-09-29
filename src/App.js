@@ -380,6 +380,18 @@ function App() {
         const fechaStr = `${year}-${month}-${String(i).padStart(2, '0')}`;
         
         const partesDb = asistencias.filter(a => Number(a.idTrabajador) === parseInt(trabajadorFiltro) && a.fecha === fechaStr);
+        
+        // Deduplicar registros duplicados para el mismo día y obra
+        const partesDbUnicas = [];
+        const obrasVistas = new Set();
+        partesDb.forEach(p => {
+          const key = p.idObra ? String(p.idObra) : 'sin_obra';
+          if (!obrasVistas.has(key)) {
+            obrasVistas.add(key);
+            partesDbUnicas.push(p);
+          }
+        });
+
         const trabObj = trabajadores.find(t => t.id === parseInt(trabajadorFiltro));
         const defaultPrecioH = (trabObj?.precioHora && Number(trabObj.precioHora) > 0)
           ? trabObj.precioHora
@@ -390,7 +402,7 @@ function App() {
           ? trabObj.precioHoraExtra
           : '';
         
-        if (partesDb.length === 0) {
+        if (partesDbUnicas.length === 0) {
           nuevoCuadrante.push({
             nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
             fechaStr, idAsis: null, asistencia: '', horario: '', idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', tipoPago: 'Normal', pagoDia: 0.0,
@@ -398,7 +410,7 @@ function App() {
             precioHoraExtra: defaultPrecioHExtra
           });
         } else {
-          partesDb.forEach(parteDb => {
+          partesDbUnicas.forEach(parteDb => {
             nuevoCuadrante.push({
               nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
               fechaStr, idAsis: parteDb.id, asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No'),
@@ -522,8 +534,20 @@ function App() {
         estadoVal = 'Presente';
       }
 
+      let idAEnviar = dia.idAsis || null;
+      if (!idAEnviar) {
+        const existente = asistencias.find(a => 
+          Number(a.idTrabajador) === parseInt(trabajadorFiltro) && 
+          a.fecha === dia.fechaStr && 
+          ((!a.idObra && !dia.idObra) || (a.idObra && dia.idObra && Number(a.idObra) === Number(dia.idObra)))
+        );
+        if (existente) {
+          idAEnviar = existente.id;
+        }
+      }
+
       return {
-        id: dia.idAsis || null,
+        id: idAEnviar,
         fecha: dia.fechaStr,
         idTrabajador: parseInt(trabajadorFiltro),
         idObra: dia.idObra ? parseInt(dia.idObra) : null,
@@ -550,6 +574,16 @@ function App() {
           body: JSON.stringify(lotes) 
         });
         if (!res.ok) throw new Error(await res.text() || res.statusText);
+        const guardadas = await res.json();
+        if (Array.isArray(guardadas)) {
+          setCuadrante(prev => prev.map(dia => {
+            const match = guardadas.find(g => 
+              g.fecha === dia.fechaStr && 
+              ((dia.idAsis && g.id === dia.idAsis) || (!dia.idAsis && ((!g.idObra && !dia.idObra) || (g.idObra && dia.idObra && Number(g.idObra) === Number(dia.idObra)))))
+            );
+            return match ? { ...dia, idAsis: match.id, isNewRow: false } : dia;
+          }));
+        }
         alert("¡Cuadrante guardado en la base de datos con éxito!"); 
         cargarAsistencias();
       } catch (error) { 
