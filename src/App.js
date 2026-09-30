@@ -1584,7 +1584,7 @@ function App() {
           {usuarioActual?.rol === 'ADMIN' && <button onClick={() => setSeccionActiva('usuarios')} className={`btn-nav ${seccionActiva === 'usuarios' ? 'active' : ''}`}>⚙️ Ajustes</button>}
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '6px', marginRight: '6px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'black' }}>
               👤 {usuarioActual?.nombre || usuarioActual?.username}
             </span>
             <span style={{ 
