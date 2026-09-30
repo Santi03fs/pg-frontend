@@ -445,7 +445,6 @@ function App() {
         const defaultPrecioHExtra = (trabObj?.precioHoraExtra && Number(trabObj.precioHoraExtra) > 0)
           ? trabObj.precioHoraExtra
           : '';
-        
         if (partesDbUnicas.length === 0) {
           nuevoCuadrante.push({
             nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
@@ -455,18 +454,49 @@ function App() {
             obrasMultiples: ''
           });
         } else {
-          partesDbUnicas.forEach(parteDb => {
-            nuevoCuadrante.push({
+          if (seccionActiva === 'nominas') {
+             let horasTotal = 0;
+             let horasExtraTotal = 0;
+             const obrasSet = new Set();
+             partesDbUnicas.forEach(p => {
+               if (p.horasTrabajadas) horasTotal += p.horasTrabajadas;
+               if (p.horasExtra) horasExtraTotal += p.horasExtra;
+               if (p.idObra) obrasSet.add(String(p.idObra));
+               if (p.obrasMultiples) {
+                 p.obrasMultiples.split(',').forEach(id => {
+                   if (id.trim() !== '') obrasSet.add(id.trim());
+                 });
+               }
+             });
+             const obrasUnidas = Array.from(obrasSet).join(',');
+             const parteDb = partesDbUnicas[0];
+             nuevoCuadrante.push({
               nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
-              fechaStr, idAsis: parteDb.id, asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'Sí' : 'No'),
-              horario: parteDb.horario || '', idObra: parteDb.idObra || '', partida: parteDb.partida || '', 
-              horas: parteDb.horasTrabajadas !== undefined && parteDb.horasTrabajadas !== null ? parteDb.horasTrabajadas : '',
-              horasExtra: parteDb.horasExtra !== undefined && parteDb.horasExtra !== null ? parteDb.horasExtra : '',
+              fechaStr, idAsis: parteDb.id, asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'S' : 'No'),
+              horario: parteDb.horario || '', idObra: '', partida: parteDb.partida || '', 
+              horas: horasTotal > 0 ? horasTotal : '',
+              horasExtra: horasExtraTotal > 0 ? horasExtraTotal : '',
               descripcionExtra: parteDb.descripcion || '', tipoPago: parteDb.tipoPago || 'Normal', pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0,
               precioHora: (parteDb.precioHora !== undefined && parteDb.precioHora !== null && parteDb.precioHora !== 0) ? parteDb.precioHora : defaultPrecioH,
               precioHoraExtra: (parteDb.precioHoraExtra !== undefined && parteDb.precioHoraExtra !== null && parteDb.precioHoraExtra !== 0) ? parteDb.precioHoraExtra : defaultPrecioHExtra,
-              obrasMultiples: parteDb.obrasMultiples || ''
+              obrasMultiples: obrasUnidas
             });
+          } else {
+            partesDbUnicas.forEach(parteDb => {
+              nuevoCuadrante.push({
+                nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
+                fechaStr, idAsis: parteDb.id, asistencia: parteDb.estadoAsistencia === 'Vacaciones' ? 'Vacaciones' : (parteDb.haAsistido ? 'S' : 'No'),
+                horario: parteDb.horario || '', idObra: parteDb.idObra || '', partida: parteDb.partida || '', 
+                horas: parteDb.horasTrabajadas !== undefined && parteDb.horasTrabajadas !== null ? parteDb.horasTrabajadas : '',
+                horasExtra: parteDb.horasExtra !== undefined && parteDb.horasExtra !== null ? parteDb.horasExtra : '',
+                descripcionExtra: parteDb.descripcion || '', tipoPago: parteDb.tipoPago || 'Normal', pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0,
+                precioHora: (parteDb.precioHora !== undefined && parteDb.precioHora !== null && parteDb.precioHora !== 0) ? parteDb.precioHora : defaultPrecioH,
+                precioHoraExtra: (parteDb.precioHoraExtra !== undefined && parteDb.precioHoraExtra !== null && parteDb.precioHoraExtra !== 0) ? parteDb.precioHoraExtra : defaultPrecioHExtra,
+                obrasMultiples: parteDb.obrasMultiples || ''
+              });
+            });
+          }
+        }    });
           });
         }
       }
@@ -497,7 +527,7 @@ function App() {
 
       setCuadrante(nuevoCuadrante);
     }
-  }, [mesFiltro, trabajadorFiltro, asistencias, obras, trabajadores]);
+  }, [mesFiltro, trabajadorFiltro, asistencias, obras, trabajadores, seccionActiva]);
 
   const handleCambiarPrecioHoraGlobal = (nuevoPrecio) => {
     setPrecioHoraNominaGlobal(nuevoPrecio);
