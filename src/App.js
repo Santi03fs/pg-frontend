@@ -496,8 +496,6 @@ function App() {
               });
             });
           }
-        }    });
-          });
         }
       }
       // Inicializar precios globales para el autocompletado superior
