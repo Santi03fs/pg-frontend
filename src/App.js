@@ -19,6 +19,49 @@ const LogoPG = () => (
 );
 
 const plantillaPartidasPredefinidas = Array.from({length: 30}, (_, i) => `Partida ${i+1}`);
+
+const MultiSelectObras = ({ obras, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const selectedIds = value ? String(value).split(',') : [];
+  
+  const toggleObra = (id) => {
+    const strId = String(id);
+    let newSelected;
+    if (selectedIds.includes(strId)) {
+      newSelected = selectedIds.filter(i => i !== strId);
+    } else {
+      newSelected = [...selectedIds, strId];
+    }
+    onChange(newSelected.join(','));
+  };
+
+  const selectedNames = selectedIds.map(id => obras.find(o => String(o.id) === id)?.nombreObra).filter(Boolean).join(' - ');
+
+  return (
+    <div style={{ position: 'relative', width: '100%', textAlign: 'left' }}>
+      <div 
+        className="input-paper" 
+        style={{ minHeight: '24px', cursor: 'pointer', padding: '2px 4px', background: 'transparent' }}
+        onClick={() => setOpen(!open)}
+      >
+        {selectedNames || 'Seleccionar...'}
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, minWidth: '150px', background: '#fff', border: '1px solid #000', zIndex: 100, maxHeight: '200px', overflowY: 'auto' }}>
+          {obras.map(o => (
+            <label key={o.id} style={{ display: 'flex', alignItems: 'center', padding: '6px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '12px', color: '#000', margin: 0 }}>
+              <input type="checkbox" checked={selectedIds.includes(String(o.id))} onChange={() => toggleObra(o.id)} style={{ marginRight: '8px' }} />
+              {o.nombreObra}
+            </label>
+          ))}
+          <div style={{ padding: '6px', textAlign: 'center', background: '#ecf0f1', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setOpen(false)}>
+            Cerrar
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 const plantillaFasesPredefinidas = Array.from({length: 30}, (_, i) => `Fase ${i+1}`);
 
 
@@ -408,7 +451,8 @@ function App() {
             nDia: i, nMes: nombresMeses[fechaActual.getMonth()], nSem: nombresDias[diaSemana], esFinde: diaSemana === 0 || diaSemana === 6,
             fechaStr, idAsis: null, asistencia: '', horario: '', idObra: '', partida: '', horas: '', horasExtra: '', descripcionExtra: '', tipoPago: 'Normal', pagoDia: 0.0,
             precioHora: defaultPrecioH,
-            precioHoraExtra: defaultPrecioHExtra
+            precioHoraExtra: defaultPrecioHExtra,
+            obrasMultiples: ''
           });
         } else {
           partesDbUnicas.forEach(parteDb => {
@@ -420,7 +464,8 @@ function App() {
               horasExtra: parteDb.horasExtra !== undefined && parteDb.horasExtra !== null ? parteDb.horasExtra : '',
               descripcionExtra: parteDb.descripcion || '', tipoPago: parteDb.tipoPago || 'Normal', pagoDia: parteDb.pagoDia !== undefined && parteDb.pagoDia !== null ? parteDb.pagoDia : 0.0,
               precioHora: (parteDb.precioHora !== undefined && parteDb.precioHora !== null && parteDb.precioHora !== 0) ? parteDb.precioHora : defaultPrecioH,
-              precioHoraExtra: (parteDb.precioHoraExtra !== undefined && parteDb.precioHoraExtra !== null && parteDb.precioHoraExtra !== 0) ? parteDb.precioHoraExtra : defaultPrecioHExtra
+              precioHoraExtra: (parteDb.precioHoraExtra !== undefined && parteDb.precioHoraExtra !== null && parteDb.precioHoraExtra !== 0) ? parteDb.precioHoraExtra : defaultPrecioHExtra,
+              obrasMultiples: parteDb.obrasMultiples || ''
             });
           });
         }
@@ -552,6 +597,7 @@ function App() {
         fecha: dia.fechaStr,
         idTrabajador: parseInt(trabajadorFiltro),
         idObra: dia.idObra ? parseInt(dia.idObra) : null,
+        obrasMultiples: dia.obrasMultiples || null,
         haAsistido: haAsistidoVal,
         estadoAsistencia: estadoVal,
         horasTrabajadas: dia.horas !== '' && dia.horas !== null && !isNaN(parseFloat(dia.horas)) ? parseFloat(dia.horas) : null,
@@ -2667,10 +2713,8 @@ function App() {
                           </td>
 
                           {/* 5. Obra */}
-                          <td style={{ border: '1px solid black', textAlign: 'left' }}>
-                            <select className="input-paper" style={{ textAlign: 'left' }} value={diaInfo.idObra} onChange={e => handleEditCuadrante(index, 'idObra', e.target.value)}>
-                              <option value=""></option>{obras.map(o => <option key={o.id} value={o.id}>{o.nombreObra}</option>)}
-                            </select>
+                          <td style={{ border: '1px solid black', textAlign: 'left', minWidth: '150px' }}>
+                            <MultiSelectObras obras={obras} value={diaInfo.obrasMultiples} onChange={val => handleEditCuadrante(index, 'obrasMultiples', val)} />
                           </td>
 
                           {/* 6. Precio Hora */}
