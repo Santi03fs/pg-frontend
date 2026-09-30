@@ -153,6 +153,7 @@ function App() {
 
   
   const [idObraSelGasto, setIdObraSelGasto] = useState('');
+  const [idGastoEditando, setIdGastoEditando] = useState(null);
   const [partidaGasto, setPartidaGasto] = useState('');
   const [faseGasto, setFaseGasto] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -1176,10 +1177,42 @@ function App() {
     }
   };
 
+  const resetGastoForm = () => {
+    setIdGastoEditando(null); setIdObraSelGasto(''); setPartidaGasto(''); setFaseGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp('');
+  };
+
+  const editarGasto = (g) => {
+    setIdGastoEditando(g.id);
+    setIdObraSelGasto(g.idObra);
+    setPartidaGasto(g.partida || '');
+    setFaseGasto(g.fase || '');
+    setCategoria(g.categoria || '');
+    setFechaGasto(g.fecha || '');
+    setDescripcion(g.descripcion || '');
+    setProvTrabajador(g.provTrabajador || '');
+    setUdsHoras(g.udsHoras || '');
+    setPrecioNeto(g.precioNeto || '');
+    setPrecioPvp(g.precioPvp || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const eliminarGasto = (id) => {
+    if (window.confirm("¿Estás seguro de eliminar este gasto/material?")) {
+      fetch(`${API_BASE_URL}/api/gastos/${id}`, { method: 'DELETE' })
+      .then(() => cargarGastos());
+    }
+  };
+
   const guardarGasto = (e) => { 
     e.preventDefault(); 
-    fetch(`${API_BASE_URL}/api/gastos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idObra: parseInt(idObraSelGasto), categoria, partida: partidaGasto, fase: faseGasto, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 }) })
-    .then(() => { setIdObraSelGasto(''); setPartidaGasto(''); setFaseGasto(''); setCategoria(''); setFechaGasto(''); setDescripcion(''); setProvTrabajador(''); setUdsHoras(''); setPrecioNeto(''); setPrecioPvp(''); cargarGastos(); }); 
+    const payload = { idObra: parseInt(idObraSelGasto), categoria, partida: partidaGasto, fase: faseGasto, fecha: fechaGasto, descripcion, provTrabajador, udsHoras: parseFloat(udsHoras) || 0, precioNeto: parseFloat(precioNeto) || 0, precioPvp: parseFloat(precioPvp) || 0 };
+    if (idGastoEditando) {
+      fetch(`${API_BASE_URL}/api/gastos/${idGastoEditando}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(() => { resetGastoForm(); cargarGastos(); });
+    } else {
+      fetch(`${API_BASE_URL}/api/gastos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(() => { resetGastoForm(); cargarGastos(); }); 
+    }
   };
 
   // ================= LA MAGIA DE EXPORTAR A EXCEL (ESTRUCTURA EXACTA DE PARTIDAS Y FASES) =================
@@ -2430,15 +2463,24 @@ function App() {
                 <input className="input-standard" type="number" step="0.01" placeholder="Neto €" value={precioNeto} onChange={e=>setPrecioNeto(e.target.value)} style={{borderColor: '#e74c3c', flex: 1}} />
                 <input className="input-standard" type="number" step="0.01" placeholder="PVP €" value={precioPvp} onChange={e=>setPrecioPvp(e.target.value)} style={{borderColor: '#3498db', flex: 1}} />
               </div>
-              <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: '#e74c3c', gridColumn: '1 / -1'}}>Registrar Gasto</button>
+              <div style={{ display: 'flex', gap: '10px', gridColumn: '1 / -1' }}>
+                <button type="submit" className="btn-action full-width-mobile" style={{backgroundColor: idGastoEditando ? '#f39c12' : '#e74c3c', flex: 1}}>
+                  {idGastoEditando ? 'Actualizar Gasto' : 'Registrar Gasto'}
+                </button>
+                {idGastoEditando && (
+                  <button type="button" onClick={resetGastoForm} className="btn-action full-width-mobile" style={{backgroundColor: '#95a5a6', flex: 1}}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
             </form>
 
             <div style={{ overflowX: 'auto' }}>
               <table className="tabla-general">
-                <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th></tr></thead>
+                <thead><tr style={{background: '#e74c3c'}}><th>Fecha</th><th>Obra</th><th>Descripción</th><th>Neto</th><th>PVP</th><th>Acc.</th></tr></thead>
                 <tbody>
                   {gastosFiltrados.length === 0 ? (
-                    <tr><td colSpan="5" style={{textAlign:'center', color:'#95a5a6'}}>No hay gastos registrados para esta selección.</td></tr>
+                    <tr><td colSpan="6" style={{textAlign:'center', color:'#95a5a6'}}>No hay gastos registrados para esta selección.</td></tr>
                   ) : (
                     gastosFiltrados.map(g => (
                       <tr key={g.id}>
@@ -2447,6 +2489,10 @@ function App() {
                         <td>{g.descripcion} <br/><span style={{fontSize:'12px', color:'#7f8c8d'}}>{g.provTrabajador}</span></td>
                         <td style={{color: '#e74c3c', fontWeight:'bold'}}>{g.precioNeto}€</td>
                         <td style={{color: '#2980b9', fontWeight:'bold'}}>{g.precioPvp}€</td>
+                        <td>
+                          <button onClick={() => editarGasto(g)} style={{marginRight: '5px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px'}} title="Editar">✏️</button>
+                          <button onClick={() => eliminarGasto(g.id)} style={{background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px'}} title="Eliminar">🗑️</button>
+                        </td>
                       </tr>
                     ))
                   )}
