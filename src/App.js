@@ -94,9 +94,10 @@ function App() {
   // Estados para el Control Diario
   const [fechaControlDiario, setFechaControlDiario] = useState(new Date().toISOString().slice(0, 10));
   const [filasDiario, setFilasDiario] = useState([]);
-  const [filtroRolDiario, setFiltroRolDiario] = useState('Todos'); // 'Todos', 'Oficina', 'Obra', 'Hotel'
+  const [filtroRolDiario, setFiltroRolDiario] = useState('Todos'); // 'Todos', 'Oficina', 'Obra', 'Hotel', 'Personalizado'
   const [ordenDiario, setOrdenDiario] = useState('rol'); // 'rol', 'nombre'
   const [idsAEliminar, setIdsAEliminar] = useState([]);
+  const [draggedTrabajadorId, setDraggedTrabajadorId] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
   // ================= ESTADOS FORMULARIOS =================
@@ -741,6 +742,63 @@ function App() {
     }
   };
 
+  const guardarOrdenPersonalizado = async () => {
+    const lotes = trabajadores.map((t) => ({
+      id: t.id,
+      ordenPersonalizado: t.ordenPersonalizado || 0
+    }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/trabajadores/orden`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lotes)
+      });
+      if (res.ok) {
+        alert('Orden personalizado guardado con éxito');
+        cargarTrabajadores();
+      } else {
+        alert('Error al guardar el orden');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error al conectar con el servidor');
+    }
+  };
+
+  const handleDragStart = (e, trabajadorId) => {
+    if (filtroRolDiario !== 'Personalizado') return;
+    setDraggedTrabajadorId(trabajadorId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetTrabajadorId) => {
+    e.preventDefault();
+    if (filtroRolDiario !== 'Personalizado' || !draggedTrabajadorId || draggedTrabajadorId === targetTrabajadorId) return;
+
+    const arr = [...trabajadores];
+    arr.sort((a, b) => (a.ordenPersonalizado || 0) - (b.ordenPersonalizado || 0));
+
+    const draggedIndex = arr.findIndex(t => t.id === draggedTrabajadorId);
+    const targetIndex = arr.findIndex(t => t.id === targetTrabajadorId);
+    
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+      const [draggedItem] = arr.splice(draggedIndex, 1);
+      arr.splice(targetIndex, 0, draggedItem);
+      
+      const nuevosTrabajadores = arr.map((t, idx) => ({
+        ...t,
+        ordenPersonalizado: idx
+      }));
+      setTrabajadores(nuevosTrabajadores);
+    }
+    setDraggedTrabajadorId(null);
+  };
+
   const guardarControlDiario = async () => {
     for (const fila of filasDiario) {
       if (fila.estadoAsistencia === 'Presente') {
@@ -1352,11 +1410,18 @@ function App() {
 
   const filasDiarioFiltradas = filasDiario
     .filter(f => {
-      if (filtroRolDiario === 'Todos') return true;
+      if (filtroRolDiario === 'Todos' || filtroRolDiario === 'Personalizado') return true;
       if (filtroRolDiario === 'Obra') return (f.rol || 'Obra') === 'Obra' || f.rol === 'EXTRA';
       return (f.rol || 'Obra') === filtroRolDiario;
     })
     .sort((a, b) => {
+      if (filtroRolDiario === 'Personalizado') {
+        const tA = trabajadores.find(t => t.id === a.idTrabajador);
+        const tB = trabajadores.find(t => t.id === b.idTrabajador);
+        const ordA = tA?.ordenPersonalizado || 0;
+        const ordB = tB?.ordenPersonalizado || 0;
+        return ordA - ordB;
+      }
       if (ordenDiario === 'rol') {
         const ordenRoles = { 'Oficina': 1, 'Obra': 2, 'Hotel': 3, 'EXTRA': 4 };
         const rolA = ordenRoles[a.rol] || 99;
@@ -1627,6 +1692,43 @@ function App() {
                 >
                   🏨 Hotel ({filasDiario.filter(f => f.rol === 'Hotel').length})
                 </button>
+                <button 
+                  type="button" 
+                  onClick={() => setFiltroRolDiario('Personalizado')}
+                  style={{ 
+                    padding: '6px 12px', 
+                    borderRadius: '20px', 
+                    border: '1px solid', 
+                    borderColor: filtroRolDiario === 'Personalizado' ? '#8e44ad' : '#cbd5e1', 
+                    background: filtroRolDiario === 'Personalizado' ? '#8e44ad' : 'white', 
+                    color: filtroRolDiario === 'Personalizado' ? 'white' : '#8e44ad', 
+                    fontWeight: 'bold', 
+                    cursor: 'pointer', 
+                    fontSize: '12px' 
+                  }}
+                  title="Arrastra y suelta a los trabajadores para ordenarlos"
+                >
+                  ⚙️ Personalizado
+                </button>
+                {filtroRolDiario === 'Personalizado' && (
+                  <button
+                    type="button"
+                    onClick={guardarOrdenPersonalizado}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: 'none',
+                      background: '#2ecc71',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      boxShadow: '0 2px 4px rgba(46, 204, 113, 0.4)'
+                    }}
+                  >
+                    💾 Guardar Orden
+                  </button>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1686,9 +1788,22 @@ function App() {
                     </tr>
                   ) : (
                     filasDiarioFiltradas.map((fila) => (
-                      <tr key={fila.idTrabajador} style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: fila.estadoAsistencia !== 'Presente' ? '#f9f9f9' : 'white' }}>
+                      <tr 
+                        key={fila.idTrabajador} 
+                        draggable={filtroRolDiario === 'Personalizado'}
+                        onDragStart={(e) => handleDragStart(e, fila.idTrabajador)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, fila.idTrabajador)}
+                        style={{ 
+                          borderBottom: '1px solid #e0e0e0', 
+                          backgroundColor: fila.estadoAsistencia !== 'Presente' ? '#f9f9f9' : 'white',
+                          cursor: filtroRolDiario === 'Personalizado' ? 'move' : 'default',
+                          opacity: draggedTrabajadorId === fila.idTrabajador ? 0.5 : 1
+                        }}
+                      >
                         <td style={{ padding: '15px', verticalAlign: 'top' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {filtroRolDiario === 'Personalizado' && <span style={{ cursor: 'move', color: '#95a5a6' }}>☰</span>}
                             <span style={{ 
                               fontWeight: 'bold', 
                               fontSize: '15px', 
